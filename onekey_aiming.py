@@ -9,13 +9,15 @@ from python_postprocessing import *
 from Open_CSPERB import *
 from Open_CSPERB_plots import *
 from HC import *
-from Tube_materials import Inconel740H
+from Tube_materials import *
 from Flux_reader import *
 from cal_sun import *
 from scipy import interpolate
 
 class one_key_start:
-	def __init__(self, folder,num_bundle,num_fp,r_height,r_diameter,bins,tower_h,phi,elevation,DNI,D0):
+	def __init__(self, folder, num_bundle, num_fp, r_height,
+					r_diameter, bins, tower_h, phi, elevation,
+					DNI, D0):
 		self.folder=folder
 		self.r_diameter=r_diameter # receiver diameter,m
 		self.r_height=r_height # receiver height,m
@@ -32,9 +34,14 @@ class one_key_start:
 		self.latitude=34.85
 		self.dis_delta=5 # discretising the declination angle
 		self.dis_omega=25 # discretising the solar hour angle
-		
-	def run_SOLSTICE(self,dni,phi,elevation,att_factor,num_rays,csv): # the input is not a solstice style
-		# transfer into SOLSTICE convention
+
+	def run_SOLSTICE(self, dni, phi, elevation, att_factor,
+							num_rays,csv): 
+		"""
+		The input is not a solstice style
+		"""
+
+		# Transfer into SOLSTICE convention
 		phi=270.-phi
 		if phi > 360.:
 			phi=phi-360.
@@ -42,7 +49,8 @@ class one_key_start:
 		vtk_path='%s/vtk'%self.folder
 		if os.path.exists(vtk_path):
 			shutil.rmtree(vtk_path)
-		# replace keywords in SOLSTICE.py
+
+		# Replace keywords in SOLSTICE.py
 		file_path='%s/SOLSTICE.py' % self.folder
 		old_file=file_path
 		fopen=open(old_file,'r') 
@@ -88,11 +96,15 @@ class one_key_start:
 		fopen.close()
 		wopen.close()
 		os.system('python2 %s/SOLSTICE.py ' % self.folder)
-		
-	def attenuation(self,csv): # calculate the attenuation factor
+
+	def attenuation(self, csv):
+		"""
+		This script calculates the attenuation factor
+		"""
 		hst_info=np.loadtxt(csv,delimiter=',', skiprows=2)
 		foc=hst_info[:,3]
-		# to get the attenuation factor
+
+		# Get the attenuation factor
 		def func(x, b):
 			return np.exp(-b * x)
 		def fun_two(x):
@@ -104,53 +116,141 @@ class one_key_start:
 		y2 = [func(i, popt[0]) for i in xdata]
 		att_factor =popt[0]
 		return att_factor
-		
-	def HT_model(self,T_amb,V_wind): # receiver thermal model
-		rec = Cyl_receiver(radius=0.5*self.r_diameter, height=self.r_height, n_banks=self.num_bundle, n_elems=50, D_tubes_o=self.D0/1000., D_tubes_i=self.D0/1000.-2.*1.2e-3, 
-		  abs_t=0.98, ems_t=0.91, k_coating=1.2, D_coating_o=self.D0/1000.+45e-6)
-		Strt=rec.flow_path(option='cmvNib%s'%self.num_fp,fluxmap_file=self.folder+'/flux-table.csv')
-		rec.balance(HC=Na(), material=Inconel740H(), T_in=520+273.15, T_out=740+273.15, T_amb=T_amb+273.15, h_conv_ext='SK', filesave=self.folder+'/flux-table',air_velocity=V_wind)
-		flux_limits_file='%s/201015_N07740_thermoElasticPeakFlux_velocity/N07740_OD%s_WT1.20_peakFlux_vel.csv'%(self.folder,round(self.D0,2))
-		results,aiming_results,vel_max=tower_receiver_plots(files=self.folder+'/flux-table', efficiency=False, maps_3D=False, flux_map=False, flow_paths=True,saveloc=None, billboard=False, flux_limits_file=flux_limits_file,C_aiming=self.C_aiming)
+
+	def HT_model(self, T_amb, V_wind):
+		"""
+		The receiver thermal model
+		"""
+		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity'
+		rec = Cyl_receiver(
+					radius=0.5*self.r_diameter, 
+					height=self.r_height,
+					n_banks=self.num_bundle,
+					n_elems=50,
+					D_tubes_o=self.D0/1000.,
+					D_tubes_i=self.D0/1000.-2.*1.2e-3, 
+					abs_t=0.94, 
+					ems_t=0.88, 
+					k_coating=1.2, 
+					D_coating_o=self.D0/1000.+45e-6)
+		Strt = rec.flow_path(
+					option='cmvNib%s'%self.num_fp,
+					fluxmap_file=self.folder+'/flux-table.csv')
+		rec.balance(
+					HC=Na(),
+					material=Haynes230(),
+					T_in=290+273.15,
+					T_out=565+273.15,
+					T_amb=T_amb+273.15,
+					h_conv_ext='SK',
+					filesave=self.folder+'/flux-table',
+					air_velocity=V_wind)
+		flux_limits_file = \
+					'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
+					self.folder,
+					flux_folder,
+					round(self.D0,2))
+		results,aiming_results,vel_max = tower_receiver_plots(
+					files=self.folder+'/flux-table',
+					efficiency=False,
+					maps_3D=False,
+					flux_map=False,
+					flow_paths=True,
+					saveloc=None,
+					billboard=False,
+					flux_limits_file=flux_limits_file,
+					C_aiming=self.C_aiming)
 		return results,aiming_results,Strt
 
-	def aiming_loop(self,C_aiming,Exp,A_f): # the aiming strategy loop: optical + thermal
-		# the input for optical modelling
+	def aiming_loop(self,C_aiming,Exp,A_f):
+		"""
+		The aiming strategy loop: optical + thermal
+		"""
+
+		# The input for optical modelling
 		self.C_aiming=C_aiming
 		print C_aiming
 		print Exp
 		print A_f
 		att_factor=self.attenuation(self.csv_trimmed)
-		aiming(self.folder,self.r_height,self.r_diameter,C_aiming,self.csv_trimmed,self.tower_h,self.num_bundle,Exp,A_f) # change aiming points 
-		self.run_SOLSTICE(dni=self.DNI,phi=self.phi,elevation=self.elevation,att_factor=att_factor,num_rays=5000000,csv=self.csv_aiming) # optical simulation
-		eta,q_results,eta_exc_intec=proces_raw_results('%s/vtk/simul'% self.folder,'%s/vtk'% self.folder) # optical postprocessing
+
+		# Change of aiming points 
+		aiming(
+				self.folder,
+				self.r_height,
+				self.r_diameter,
+				C_aiming,
+				self.csv_trimmed,
+				self.tower_h,
+				self.num_bundle,
+				Exp,
+				A_f)
+
+		# Optical simulation
+		self.run_SOLSTICE(
+				dni=self.DNI,
+				phi=self.phi,
+				elevation=self.elevation,
+				att_factor=att_factor,
+				num_rays=5000000,
+				csv=self.csv_aiming)
+
+		# Optical postprocessing
+		eta,q_results,eta_exc_intec=proces_raw_results(
+				'%s/vtk/simul'% self.folder,
+				'%s/vtk'% self.folder)
 		eff_interception=eta/eta_exc_intec
 		print 'Interception efficiency: ' + str(eff_interception)
-		read_data(self.folder,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True) # read flux map
-		results,aiming_results,Strt=self.HT_model(20.,0.) # thermal simulation
-		#print aiming_results[0]
+
+		# Read flux map
+		read_data(
+				self.folder,
+				self.r_height,
+				self.r_diameter,
+				self.num_bundle,
+				self.bins,
+				flux_file=True)
+
+		# Thermal simulation
+		results,aiming_results,Strt=self.HT_model(20.,0.)
+
+		# Print aiming_results
 		print aiming_results[1]
-		
 		return aiming_results,eff_interception,Strt
-	
-	def search_algorithm(self): # parametric study of aiming extent
-		C_aiming=np.zeros(self.num_bundle) # aiming extent
-		C_aiming[:]=0. # equatorial aiming
-		Exp=np.zeros(self.num_bundle) # shape exponent
-		Exp[:]=1.5 # initialising exponent
-		A_f=np.zeros(self.num_bundle) # asymmetry factor
-		A_f[:int(0.25*self.num_bundle)]=A_f[int(0.75*self.num_bundle):]=0.67 # initiliasing asymmetry factor
+
+	def search_algorithm(self): 
+		"""
+		The parametric study of aiming extent
+		"""
+
+		# Aiming extent
+		C_aiming=np.zeros(self.num_bundle)
+
+		# Equatorial aiming
+		C_aiming[:]=0.0
+
+		# Shape exponent
+		Exp=np.zeros(self.num_bundle)
+
+		# Initialising exponent
+		Exp[:]=1.5
+
+		# Asymmetry factor
+		A_f=np.zeros(self.num_bundle)
+
+		# Initiliasing asymmetry factor
+		A_f[:int(0.25*self.num_bundle)]=A_f[int(0.75*self.num_bundle):]=0.67 
 		A_f[int(0.25*self.num_bundle):int(0.75*self.num_bundle)]=0.33
 		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
-		
-		# to output eff_interception at equatorial aiming
+
+		# Writting eff_interception at equatorial aiming
 		savedir='%s/Equatorial_interception.csv' % self.folder
 		f=open(savedir, 'w')
 		f.write('%s'%eff_interception)
 		f.write("\n")
 		f.close()
-		
-		# search algorithm
+
+		# Search algorithm
 		C_aiming[:]=0.5
 		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 		while np.all(aiming_results[0])==False and np.all(C_aiming<1.):
@@ -165,18 +265,23 @@ class one_key_start:
 			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 			print C_aiming
 			print aiming_results[0]
-		
-		# to output the results of search algorithm
+
+		# To output the results of search algorithm
 		savedir='%s/Search_results.csv' % self.folder
 		f=open(savedir, 'w')
 		f.write(",".join(map(str, C_aiming)))
 		f.write("\n")
 		f.close()
 		
-	def fit_algorithm(self): # optimisation of shape exponent and asymmetry factor
+	def fit_algorithm(self): 
+		"""
+		Optimisation of shape exponent and asymmetry factor
+		"""
+
 		if os.path.exists('%s/output'%self.folder):
 			shutil.rmtree('%s/output'%self.folder)
-		# run the results after search algorithm
+
+		# Run the results after search algorithm
 		savedir='%s/Search_results.csv' % self.folder 
 		C_aiming=np.loadtxt(savedir,delimiter=',', skiprows=0)
 		Exp=np.zeros(self.num_bundle)
@@ -186,11 +291,16 @@ class one_key_start:
 		A_f[int(0.25*self.num_bundle):int(0.75*self.num_bundle)]=0.33
 		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 
-		#The optimisation uses Dakota from Sandia. Dakota is activated by running the dakota input file GA.in from os.system.
-		#Dakota has an interface with python code, which is programmed in Dakota_interface.py.
-		#There can be a series of optimisation in the fit algorithm, hence, another code Dakota_aiming.py is established. The current code
-		#functions as changing the keywords in Dakota_aiming.py ready for different optimisations.
-		
+		"""
+		The optimisation uses Dakota from Sandia.
+		Dakota is activated by running the dakota input file GA.in from os.system.
+		Dakota has an interface with python code, which is programmed in Dakota_interface.py.
+		There can be a series of optimisation in the fit algorithm, 
+		hence another code Dakota_aiming.py is established.
+		The current code functions as changing the keywords
+		in Dakota_aiming.py ready for different optimisations.
+		"""
+
 		# initialisation for the optimisation
 		file_path='%s/Dakota_aiming.py' % self.folder
 		old_file=file_path
@@ -230,8 +340,10 @@ class one_key_start:
 		wopen.write(w_str)
 		fopen.close()
 		wopen.close()
-		
-		# Strt comes from the receiver thermal model and shows the relationship between flow path and bank index.
+
+		"""Strt comes from the receiver thermal model 
+		and shows the relationship between flow path and bank index."""
+
 		for i in range(self.num_fp):
 			fopen=open(old_file,'r') 
 			w_str=""
@@ -304,13 +416,15 @@ class one_key_start:
 			w_str=""
 			for line in fopen:
 				if re.search('Exp_%s_%s' % (int(i/2)+1,i%2+1),line):
-					line = "	Exp_%s_%s=Exp[%s]=%s\n" % (int(i/2)+1,i%2+1,Tube[i],'x[0]') # change the optimised variables to x[0],x[1]..
+					# change the optimised variables to x[0],x[1]..
+					line = "	Exp_%s_%s=Exp[%s]=%s\n" % (int(i/2)+1,i%2+1,Tube[i],'x[0]')
 					w_str+=line
 				elif re.search('A_f_%s_%s' % (int(i/2)+1,i%2+1),line):
 					line = "	A_f_%s_%s=A_f[%s]=%s\n" % (int(i/2)+1,i%2+1,Tube[i],'x[1]')
 					w_str+=line
 				elif re.search('gx=',line):
-					line = "	gx=aiming_results[2][%s]\n" % i # change the objective function to the crossover extent at the current tube bank
+					# change the objective function to the crossover extent at the current tube bank
+					line = "	gx=aiming_results[2][%s]\n" % i
 					w_str+=line
 				else:
 					w_str+=line
@@ -366,11 +480,16 @@ class one_key_start:
 		f.write(",".join(map(str, A_f)))
 		f.write("\n")
 		f.close()
-		
-	def adjust_algorithm(self,varying_DNI=False): # re-adjust the aiming extent if crossover still exists
+
+	def adjust_algorithm(self,varying_DNI=False): 
+		"""
+		Re-adjust the aiming extent if crossover still exists
+		"""
 		# to read the results of fit algorithm
 		savedir='%s/Fit_results.csv' % self.folder
-		if varying_DNI==True: # for DNI deviated from the clear-sky DNI
+
+		# for DNI deviated from the clear-sky DNI
+		if varying_DNI==True:
 			savedir='%s/Interpolated_results.csv' % self.folder
 		Results=np.loadtxt(savedir,delimiter=',', skiprows=0)
 		C_aiming=Results[0]
@@ -379,7 +498,8 @@ class one_key_start:
 		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 		print aiming_results[2][:16]
 		print eff_interception
-		# adjustment algorithm
+
+		# Adjustment algorithm
 		while (not np.all(aiming_results[2]<10.)):
 			for i in range(self.num_bundle):
 				if aiming_results[1][i]==False:
@@ -395,8 +515,8 @@ class one_key_start:
 			print A_f
 			print aiming_results[2]
 			print eff_interception
-			
-		# to output the final results
+
+		# Write the final results to output
 		if varying_DNI==True:
 			savedir='%s/Interpolated_final_results.csv' % self.folder
 		else:
@@ -410,11 +530,14 @@ class one_key_start:
 		f.write("\n")
 		f.close()
 		print 'done'
-		
+
 		# defocusing if aiming extent > 1
 		safety_aiming=[50.,50.,self.tower_h+self.r_height*0.5]
 		if (not np.all(C_aiming<=1.)):
-			title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
+			title=np.array(['x', 'y', 'z', 
+								'foc', 'aim x', 'aim y', 'aim z',
+								'm', 'm', 'm', 'm', 'm', 'm', 'm']
+								)
 			pos_and_aiming_new=np.array([])
 			csv='%s/pos_and_aiming_new.csv' % path[0]
 			hst_info=np.loadtxt(csv,delimiter=',', skiprows=2) 
@@ -435,23 +558,30 @@ class one_key_start:
 			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 			print aiming_results[2][:16]
 			print eff_interception
-		
-	def annual_aiming(self): # the get look-up tables after running MDBA optimisation at discretised points
-		Delta=np.linspace(-23.45, 23.45, num=self.dis_delta) # decliation angle
-		Omega=np.linspace(-180., 180., num=self.dis_omega) # solar hour angle
-		sun=SunPosition() # import from cal_sun.py coded by Ye Wang
+
+	def annual_aiming(self): 
+		"""
+		The get OELTs after running MDBA optimisation at discretised points
+		"""
+		# Declination angle
+		Delta=np.linspace(-23.45, 23.45, num=self.dis_delta)
+		# Solar hour angle
+		Omega=np.linspace(-180., 180., num=self.dis_omega)
+		# Import from cal_sun.py coded by Ye Wang
+		sun=SunPosition()
 		for i in range(self.dis_delta):
 			for j in range(self.dis_omega):
-				# to get the azimuth angle, elevation angle and DNI
+				# Getting the azimuth angle, elevation angle and DNI
 				daytime,sunrise=sun.solarhour(Delta[i], self.latitude)
 				theta=sun.zenith(self.latitude, Delta[i], Omega[j])
 				phi=sun.azimuth(self.latitude, theta, Delta[i], Omega[j])
 				elevation=90.-theta
-				DNI=self.get_I_Meinel(elevation) # clear-sky DNI
+				# Clear-sky DNI
+				DNI=self.get_I_Meinel(elevation)
 				print Delta[i],Omega[j],elevation,DNI
 				if elevation<=15.:
 					continue
-				# create subfolders to store the results
+				# Create subfolders to store the results
 				subfolder='%s/process/Aiming_%s_%s'%(path[0],round(Delta[i],2),round(Omega[j],2))
 				if not os.path.exists(subfolder):
 					os.makedirs(subfolder)
@@ -464,7 +594,7 @@ class one_key_start:
 				self.search_algorithm()
 				self.fit_algorithm()
 				self.adjust_algorithm()
-				# move the results to the subfolder
+				# Move the results to the subfolder
 				shutil.copy('%s/Equatorial_interception.csv' % self.folder, subfolder)
 				shutil.copy('%s/Final_results.csv' % self.folder, subfolder)
 				shutil.copy('%s/Fit_results.csv' % self.folder, subfolder)
@@ -473,16 +603,17 @@ class one_key_start:
 				if os.path.exists('%s/output'%subfolder):
 					shutil.rmtree('%s/output'%subfolder)
 				shutil.copytree('%s/output' % self.folder, '%s/output'%subfolder)
-		
-		# generate the look-up tables
-		E=np.arange((self.dis_delta+1)*(self.dis_omega+1),dtype=float).reshape(self.dis_delta+1,self.dis_omega+1)
+
+		# Generating OELTs
+		E=np.arange((self.dis_delta+1)*(self.dis_omega+1),dtype=float).\
+				reshape(self.dis_delta+1, self.dis_omega+1)
 		E[:,:]=0.
 		Delta=np.linspace(-23.45, 23.45, num=self.dis_delta)
 		Omega=np.linspace(-180., 180., num=self.dis_omega)
 		E[0,1:]=Omega
 		E[1:,0]=Delta
 		
-		# to read and output the aiming extent array
+		# Reading and writting the aiming extent array
 		for l in range(self.num_bundle):
 			E[1:,1:]=0.5
 			for i in range(self.dis_delta):
@@ -491,15 +622,15 @@ class one_key_start:
 					if os.path.exists(subfolder):
 						C_aiming=np.loadtxt('%s/Final_results.csv' % subfolder,delimiter=',', skiprows=0)
 						E[i+1,j+1]=C_aiming[0][l]
-					# to output 
-					savedir='%s/process/Aiming_%s.csv' % (self.folder,l) # look-up tables for aming extents
+					# Writting outputs: OELTs for aming extents
+					savedir='%s/process/Aiming_%s.csv' % (self.folder,l)
 					f=open(savedir, 'w')
 					for k in range(self.dis_delta+1):
 						f.write(",".join(map(str, E[k])))
 						f.write("\n")
 					f.close()
 		
-		# to read and output the shape exponent array
+		# Reading and writting the shape exponent array
 		for l in range(self.num_bundle):
 			E[1:,1:]=1.5
 			for i in range(self.dis_delta):
@@ -516,7 +647,7 @@ class one_key_start:
 						f.write("\n")
 					f.close()
 		
-		# to read and output the asymmetry factor array
+		# Reading and writting the asymmetry factor array
 		for l in range(self.num_bundle):
 			if l<4 or l>11:
 				E[1:,1:]=0.33
@@ -524,7 +655,7 @@ class one_key_start:
 				E[1:,1:]=0.67
 			for i in range(self.dis_delta):
 				for j in range(self.dis_omega):
-					subfolder='%s/process/Aiming_%s_%s' % (path[0],round(Delta[i],2),round(Omega[j],2))
+					subfolder='%s/process/Aiming_%s_%s'%(path[0],round(Delta[i],2),round(Omega[j],2))
 					if os.path.exists(subfolder):
 						A_f=np.loadtxt('%s/Final_results.csv' % subfolder,delimiter=',', skiprows=0)
 						E[i+1,j+1]=A_f[2][l]
@@ -536,13 +667,17 @@ class one_key_start:
 						f.write("\n")
 					f.close()
 	
-	def interpolation(self,delta,omega): # to get the aiming variables by using interpolation from look-up tables
+	def interpolation(self,delta,omega): 
+		"""
+		Getting the aiming variables by using interpolation from look-up tables
+		"""
 		Delta=np.linspace(-23.45, 23.45, num=self.dis_delta)
 		Omega=np.linspace(-180., 180., num=self.dis_omega)
 		C_aiming=np.zeros(self.num_bundle)
 		Exp=np.zeros(self.num_bundle)
 		A_f=np.zeros(self.num_bundle)
-		# to interpolate the aiming extent
+
+		# Interpolating the aiming extent
 		for l in range(num_bundle):
 			savedir='%s/process/Aiming_%s.csv' % (self.folder,l)
 			z=np.loadtxt(savedir,delimiter=',', skiprows=0)
@@ -550,8 +685,8 @@ class one_key_start:
 			f = interpolate.interp2d(Delta,Omega,z2, kind='linear')
 			znew = f(delta,omega)
 			C_aiming[l]=znew[0]
-		
-		# to interpolate the shape exponent
+
+		# Interpolating the shape exponent
 		for l in range(num_bundle):
 			savedir='%s/process/Shape_%s.csv' % (self.folder,l)
 			z=np.loadtxt(savedir,delimiter=',', skiprows=0)
@@ -559,8 +694,8 @@ class one_key_start:
 			f = interpolate.interp2d(Delta,Omega,z2, kind='linear')
 			znew = f(delta,omega)
 			Exp[l]=znew[0]
-		
-		# to interpolate the asymmetry factor
+
+		# Interpolating the asymmetry factor
 		for l in range(num_bundle):
 			savedir='%s/process/Asymmetry_%s.csv' % (self.folder,l)
 			z=np.loadtxt(savedir,delimiter=',', skiprows=0)
@@ -568,8 +703,8 @@ class one_key_start:
 			f = interpolate.interp2d(Delta,Omega,z2, kind='linear')
 			znew = f(delta,omega)
 			A_f[l]=znew[0]
-		
-		# to output
+
+		# Writting outputs
 		savedir='%s/Interpolated_results.csv' % self.folder
 		f=open(savedir, 'w')
 		f.write(",".join(map(str, C_aiming)))
@@ -610,12 +745,17 @@ class one_key_start:
 			shutil.copytree('%s/output' % self.folder, '%s/output'%subfolder)
 		'''
 	
-	def check(self): # to validate the interpolated results
-		# choose 5*10 discretised points to validate the interpolated results
+	def check(self): 
+		"""
+		Validating of the interpolated results
+		"""
+		# Choosing 5*10 discretised points to validate the interpolated results
 		Delta=np.linspace(-23., 23., num=5)
 		Omega=np.linspace(-60., 60., num=10)
-		Validation_results=np.full((5,10), False, dtype=bool) # boolean array for validation results
+		# boolean array for validation results
+		Validation_results=np.full((5,10), False, dtype=bool)
 		sun=SunPosition()
+
 		#A_over=np.array([0.,20.])
 		for i in range(5):
 			for j in range(10):
@@ -637,46 +777,64 @@ class one_key_start:
 				if np.all(aiming_results[2]<10.)==True: # Very small deviation is allowed here.
 					Validation_results[i,j]=True
 		print Validation_results
-	
-	def varying_DNI(self,delta,omega,factor): # for cases when real DNI deviates from clear-sky values
-		# get the interpolated results
+
+	def varying_DNI(self,delta,omega,factor):
+		"""
+		For cases when real DNI deviates from clear-sky values
+		"""
+		# Getting the interpolated results
 		self.interpolation(delta,omega) 
 		sun=SunPosition()
 		daytime,sunrise=sun.solarhour(delta, self.latitude)
 		theta=sun.zenith(self.latitude, delta, omega)
 		phi=sun.azimuth(self.latitude, theta, delta, omega)
 		elevation=90.-theta
-		DNI=self.get_I_Meinel(elevation) # clear-sky DNI
+		# Clear-sky DNI
+		DNI=self.get_I_Meinel(elevation)
 		self.phi=phi
 		self.elevation=elevation
-		self.DNI=DNI*factor # the real DNI
-		self.adjust_algorithm(varying_DNI=True) # use the adjustment algorithm to re-adjust the aiming extent
+		# Real DNI
+		self.DNI=DNI*factor
+		# Using the adjustment algorithm to re-adjust the aiming extent
+		self.adjust_algorithm(varying_DNI=True) 
 	
-	def get_I_Meinel(self,elevation): # Meinel clear-sky model
+	def get_I_Meinel(self,elevation):
+		"""
+		Meinel clear-sky model
+		"""
 		I0=1363.
 		zenith=90.-elevation
 		AM=1./np.cos(zenith/180.*np.pi)
 		I=I0*0.7**(AM**0.678)
 		return I
 	
-	def New_search_algorithm(self):  # the net one-key algorithm to get the optimised aiming points
-		C_aiming=np.zeros(self.num_bundle) # aiming extent
-		C_aiming[:]=0. # equatorial aiming
-		Exp=np.zeros(self.num_bundle) # shape exponent
-		Exp[:]=2.0 # initialising exponent
-		A_f=np.zeros(self.num_bundle) # asymmetry factor
+	def New_search_algorithm(self):
+		"""
+		The net one-key algorithm to get the optimised aiming points
+		"""
+		# Aiming extent
+		C_aiming=np.zeros(self.num_bundle)
+		# Equatorial aiming
+		C_aiming[:]=0.0
+		# Shape exponent
+		Exp=np.zeros(self.num_bundle)
+		# Initialising exponent
+		Exp[:]=2.0
+		# Asymmetry factor
+		A_f=np.zeros(self.num_bundle)
 		if self.num_bundle/self.num_fp == 1:
 			A_f[:]=0.75
 		elif self.num_bundle/self.num_fp == 2:
 			A_f[:int(0.25*self.num_bundle)]=A_f[int(0.75*self.num_bundle):]=0.67
 			A_f[int(0.25*self.num_bundle):int(0.75*self.num_bundle)]=0.33
-		
-		# new search algorithm
+
+		# New search algorithm
 		C_aiming[:]=0.5
-		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+		aiming_results,eff_interception,Strt=\
+				self.aiming_loop(C_aiming,Exp,A_f)
 		gap=0.05
 		while np.all(aiming_results[1])==False and np.all(C_aiming<1.):
-			# for E
+			# Searching for E
 			C_aiming_old=np.ones(self.num_bundle)
 			C_aiming_old[:]=C_aiming[:]
 			for i in range(self.num_bundle):
@@ -687,7 +845,7 @@ class one_key_start:
 					else:
 						C_aiming[Strt[i]+1]+=gap
 					C_aiming[Strt[i]-1]+=gap
-				# for A
+				# Searching for A
 				if A_f[Strt[i]]>0.5:
 					if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
 						A_f[Strt[i]]+=0.02
@@ -698,28 +856,30 @@ class one_key_start:
 						A_f[Strt[i]]-=0.02
 					elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
 						A_f[Strt[i]]+=0.02
-				# for S
+				# Searching for S
 				if aiming_results[5][i]>0.55:
 					Exp[Strt[i]]-=0.2
 				elif aiming_results[5][i]<0.45:
 					Exp[Strt[i]]+=0.2
-			C_aiming[C_aiming-C_aiming_old>gap]=C_aiming_old[C_aiming-C_aiming_old>gap]+gap
-			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
-	
+			C_aiming[C_aiming-C_aiming_old>gap]=\
+					C_aiming_old[C_aiming-C_aiming_old>gap]+gap
+			aiming_results,eff_interception,Strt=\
+					self.aiming_loop(C_aiming,Exp,A_f)
+
 if __name__=='__main__':
 	from sys import path
 	folder=path[0]
-	num_bundle=16
-	r_height=24.
-	r_diameter=16.
-	bins=50
-	tower_h=175.
-	phi=0.0
-	elevation=55.15
-	DNI=980.0
-	num_fp=num_bundle/2
-	D0=60.33
-	Model=one_key_start(folder,num_bundle,num_fp,r_height,r_diameter,bins,tower_h,phi,elevation,DNI,D0)	
+	num_bundle=16		#Number of panels
+	r_height=24.		#
+	r_diameter=16.		#
+	bins=50				#Vertical bins
+	tower_h=175.		#tower height
+	phi=0.0				#solar azimuth angle
+	elevation=55.15	#solar elevation angle
+	DNI=980.0			#Beam irradiance
+	num_fp=num_bundle/2	#Two panels per flow path
+	D0=60.33				#Panel tube OD
+	Model=one_key_start(folder,num_bundle,num_fp,r_height,r_diameter,bins,tower_h,phi,elevation,DNI,D0)
 	#Model.search_algorithm()
 	#Model.fit_algorithm()
 	#Model.adjust_algorithm()
