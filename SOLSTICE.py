@@ -343,10 +343,10 @@ class SolsticeScene:
    '''
 
 num_rays_1=5000000
-att_factor_1=0.00010783139577227573
-mainfolder_1='/home/admin-shuang/OneDrive/Sodium_project/Aiming/New/Git/git-aiming'
+att_factor_1=0.000107831395772
+mainfolder_1='/mnt/fb7cc2c9-e328-4f3f-a6f8-918195722408/MDBA-Aiming-Strategy/example'
 casefolder='%s/vtk' % mainfolder_1
-csv_1='/home/admin-shuang/OneDrive/Sodium_project/Aiming/New/Git/git-aiming/pos_and_aiming_new.csv'
+csv_1='/mnt/fb7cc2c9-e328-4f3f-a6f8-918195722408/MDBA-Aiming-Strategy/example/pos_and_aiming_new.csv'
 if not os.path.exists(casefolder):
 	os.makedirs(casefolder)
 azimuth_1=270.0
