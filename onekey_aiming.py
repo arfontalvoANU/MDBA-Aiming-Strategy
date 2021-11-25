@@ -15,10 +15,21 @@ from cal_sun import *
 from scipy import interpolate
 
 class one_key_start:
-	def __init__(self, folder, num_bundle, num_fp, r_height,
-					r_diameter, bins, tower_h, phi, elevation,
-					DNI, D0):
+	def __init__(self,
+					folder,
+					source,
+					num_bundle,
+					num_fp,
+					r_height,
+					r_diameter,
+					bins,
+					tower_h,
+					phi,
+					elevation,
+					DNI,
+					D0):
 		self.folder=folder
+		self.source=source
 		self.r_diameter=r_diameter # receiver diameter,m
 		self.r_height=r_height # receiver height,m
 		self.num_bundle=num_bundle # number of panels
@@ -51,7 +62,7 @@ class one_key_start:
 			shutil.rmtree(vtk_path)
 
 		# Replace keywords in SOLSTICE.py
-		file_path='%s/SOLSTICE.py' % self.folder
+		file_path='%s/SOLSTICE.py' % self.source
 		old_file=file_path
 		fopen=open(old_file,'r') 
 		w_str=""
@@ -95,7 +106,7 @@ class one_key_start:
 		wopen.write(w_str)
 		fopen.close()
 		wopen.close()
-		os.system('python2 %s/SOLSTICE.py ' % self.folder)
+		os.system('python2 %s/SOLSTICE.py ' % self.source)
 
 	def attenuation(self, csv):
 		"""
@@ -147,7 +158,7 @@ class one_key_start:
 					air_velocity=V_wind)
 		flux_limits_file = \
 					'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
-					self.folder,
+					self.source,
 					flux_folder,
 					round(self.D0,2))
 		results,aiming_results,vel_max = tower_receiver_plots(
@@ -161,6 +172,38 @@ class one_key_start:
 					flux_limits_file=flux_limits_file,
 					C_aiming=self.C_aiming)
 		return results,aiming_results,Strt
+
+	def simple_HT_model(self, T_amb, V_wind):
+		"""
+		The receiver thermal model
+		"""
+		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity'
+		rec = Cyl_receiver(
+					radius=0.5*self.r_diameter, 
+					height=self.r_height,
+					n_banks=self.num_bundle,
+					n_elems=50,
+					D_tubes_o=self.D0/1000.,
+					D_tubes_i=self.D0/1000.-2.*1.2e-3, 
+					abs_t=0.94, 
+					ems_t=0.88, 
+					k_coating=1.2, 
+					D_coating_o=self.D0/1000.+45e-6
+					)
+		Strt = rec.flow_path(
+					option='cmvNib%s'%self.num_fp,
+					fluxmap_file=self.folder+'/flux-table.csv'
+					)
+		rec.balance(
+					HC=Na(),
+					material=Haynes230(),
+					T_in=290+273.15,
+					T_out=565+273.15,
+					T_amb=T_amb+273.15,
+					h_conv_ext='SK',
+					filesave=self.folder+'/flux-table',
+					air_velocity=V_wind
+					)
 
 	def aiming_loop(self,C_aiming,Exp,A_f):
 		"""
