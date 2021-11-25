@@ -13,43 +13,131 @@ from Tube_materials import *
 from Flux_reader import *
 from cal_sun import *
 from scipy import interpolate
+from run_solstice import *
 
 class one_key_start:
-	def __init__(self,
-					folder,
-					source,
-					num_bundle,
-					num_fp,
-					r_height,
-					r_diameter,
-					bins,
-					tower_h,
-					phi,
-					elevation,
-					DNI,
-					D0):
+	def __init__(self, folder, source, num_bundle, num_fp, r_height,
+			r_diameter, bins, tower_h, phi, elevation, DNI, D0,
+			num_rays=5e6, lat=34.85, ndec=5, nhra=25):
+		"""
+		Instantiation of a receiver object to adjust the aiming points
+		using the MDBA method from Wang et al. (2021)
+		https://doi.org/10.1016/j.solener.2021.07.059
+		
+		Inputs:
+			folder:              The case folder
+			source:              Source code folder
+			num_bundle:          Number of panels [slices]
+			num_fp:              Number of flow paths in the receiver
+			r_height:            Receiver height [m]
+			r_diameter:          Receiver diameter [m]
+			bins:                Number of vertical elements [stacks]
+			tower_h:             Tower height (Base to receiver bottom) [m]
+			phi:                 Solar azimuth angle using Duffie and Beckman's covention [degrees]
+			elevation:           Solar elevation [degrees]
+			DNI:                 Beam irradiance [W/m2]
+			D0:                  Pipe outer diameter [mm]
+			num_rays:            Number of rays
+			lat:                 Latitude [degrees]
+			ndec:                Number of declination angle discretisations (annual simulation only)
+			nhra:                Number of hour angle discretisations (annual simulation only)
+		Outputs:
+			self:                Object
+		"""
+
+		# Assigning the values
 		self.folder=folder
 		self.source=source
-		self.r_diameter=r_diameter # receiver diameter,m
-		self.r_height=r_height # receiver height,m
-		self.num_bundle=num_bundle # number of panels
-		self.num_fp=num_fp # number of flow paths
-		self.bins=bins # receiver vertical bin
-		self.tower_h=tower_h # tower height,m
-		self.phi=phi # azimuth angle, deg
-		self.elevation=elevation # elevation angle, deg
-		self.DNI=DNI # DNI,W/m2
-		self.D0=D0 # pipe outer diameter, mm
+		self.r_diameter=r_diameter
+		self.r_height=r_height
+		self.num_bundle=num_bundle
+		self.num_fp=num_fp
+		self.bins=bins
+		self.tower_h=tower_h
+		self.phi=phi
+		self.elevation=elevation
+		self.DNI=DNI
+		self.D0=D0
 		self.csv_aiming='%s/pos_and_aiming_new.csv' % self.folder
 		self.csv_trimmed='%s/pos_and_aiming.csv'%self.folder
-		self.latitude=34.85
-		self.dis_delta=5 # discretising the declination angle
-		self.dis_omega=25 # discretising the solar hour angle
+		self.latitude=lat
+		self.dis_delta=ndec
+		self.dis_omega=nhra
+		self.num_rays=int(num_rays)
 
-	def run_SOLSTICE(self, dni, phi, elevation, att_factor,
-							num_rays,csv): 
+	def run_SOLSTICE(self, dni, phi, elevation, att_factor, num_rays,csv, user_folder=False, ufolder='vtk'):
 		"""
-		The input is not a solstice style
+		New function to create a YAML file and run SOLSTICE.
+		Modified from Wang's original
+		Inputs:
+			dni [W/m2]:           Beam irradiance
+			phi [degrees]:        Solar azimuth (SOLSTICE convention)
+			elevation [degrees]:  Solar elevation
+			att_factor [-]:       Attenuation factor
+			num_rays [int]:       Number of rays
+			csv [-]:              Field coordinates (X,Y)
+		Outputs:
+			demo.yaml
+			demo_rcv.yaml
+			simul
+		"""
+
+		# Converting azimuth into the SOLSTICE convention
+		phi=270.0-phi
+		if (phi>=360.0 or phi<0.0):
+			phi = (phi+360.0)%(360.0)
+		print('azi: %s [deg]\tele: %s [deg]\tdni: %s [W/m2]'%(phi, elevation, dni))
+
+		# Defining folder to save yaml and simul files
+		if ufolder:
+			vtk_path='%s/%s'%(self.folder,ufolder)
+		else:
+			vtk_path='%s/vtk'%self.folder
+
+		if os.path.exists(vtk_path):
+			shutil.rmtree(vtk_path)
+
+		# Creating SOLSTICE scene
+		scene=SolsticeScene(
+			mainfolder=self.folder,         #
+			num_rays=num_rays,              #
+			dni=dni,                        #
+			azimuth=phi,                    #
+			zenith=elevation,               #
+			att_factor=att_factor,          #
+			csv=csv,                        #
+			tower_h=self.tower_h,
+			r_cyl=self.r_diameter/2.,
+			h_cyl=self.r_height,
+			num_bundle=self.num_bundle
+		)
+
+		if not os.path.exists(vtk_path):
+			os.makedirs(vtk_path)
+
+		# Generate YAML file
+		scene.gen_YAML()
+
+		# Run SOLSTICE
+		scene.runSOLSTICE(
+			savefile=vtk_path,
+			view=True
+			)
+
+	def old_run_SOLSTICE(self, dni, phi, elevation, att_factor, num_rays, csv):
+		"""
+		Original Wang's function to create a YAML file and run SOLSTICE
+		Inputs:
+			dni [W/m2]:           Beam irradiance
+			phi [degrees]:        Solar azimuth (SOLSTICE convention)
+			elevation [degrees]:  Solar elevation
+			att_factor [-]:       Attenuation factor
+			num_rays [int]:       Number of rays
+			csv [-]:              Field coordinates (X,Y)
+		Outputs:
+			demo.yaml
+			demo_rcv.yaml
+			simul
 		"""
 
 		# Transfer into SOLSTICE convention
@@ -110,7 +198,11 @@ class one_key_start:
 
 	def attenuation(self, csv):
 		"""
-		This script calculates the attenuation factor
+		Funtion to calculate the attenuation factor of a given field.
+		Inputs:
+			csv:                  Field coordinates (X,Y)
+		Outputs:
+			att_factor:           The attenuation factor [-]
 		"""
 		hst_info=np.loadtxt(csv,delimiter=',', skiprows=2)
 		foc=hst_info[:,3]
@@ -130,52 +222,68 @@ class one_key_start:
 
 	def HT_model(self, T_amb, V_wind):
 		"""
-		The receiver thermal model
+		Function to run the receiver thermal simulation
+		at design point (defined by self.phi and self.elevation)
+		Inputs:
+			T_amb:                Ambient temperature [deg C]
+			V_wind:               Wind velocity [m/s]
+		Output:
+			results:              
+			aiming_results:       
+			Strt:                 
 		"""
 		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity'
 		rec = Cyl_receiver(
-					radius=0.5*self.r_diameter, 
-					height=self.r_height,
-					n_banks=self.num_bundle,
-					n_elems=50,
-					D_tubes_o=self.D0/1000.,
-					D_tubes_i=self.D0/1000.-2.*1.2e-3, 
-					abs_t=0.94, 
-					ems_t=0.88, 
-					k_coating=1.2, 
-					D_coating_o=self.D0/1000.+45e-6)
+				radius=0.5*self.r_diameter, 
+				height=self.r_height,
+				n_banks=self.num_bundle,
+				n_elems=50,
+				D_tubes_o=self.D0/1000.,
+				D_tubes_i=self.D0/1000.-2.*1.2e-3, 
+				abs_t=0.94, 
+				ems_t=0.88, 
+				k_coating=1.2, 
+				D_coating_o=self.D0/1000.+45e-6)
 		Strt = rec.flow_path(
-					option='cmvNib%s'%self.num_fp,
-					fluxmap_file=self.folder+'/flux-table.csv')
+				option='cmvNib%s'%self.num_fp,
+				fluxmap_file=self.folder+'/flux-table.csv')
 		rec.balance(
-					HC=Na(),
-					material=Haynes230(),
-					T_in=290+273.15,
-					T_out=565+273.15,
-					T_amb=T_amb+273.15,
-					h_conv_ext='SK',
-					filesave=self.folder+'/flux-table',
-					air_velocity=V_wind)
+				HC=Na(),
+				material=Haynes230(),
+				T_in=290+273.15,
+				T_out=565+273.15,
+				T_amb=T_amb+273.15,
+				h_conv_ext='SK',
+				filesave=self.folder+'/flux-table',
+				air_velocity=V_wind)
 		flux_limits_file = \
-					'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
-					self.source,
-					flux_folder,
-					round(self.D0,2))
+				'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
+				self.source,
+				flux_folder,
+				round(self.D0,2))
 		results,aiming_results,vel_max = tower_receiver_plots(
-					files=self.folder+'/flux-table',
-					efficiency=False,
-					maps_3D=False,
-					flux_map=False,
-					flow_paths=True,
-					saveloc=None,
-					billboard=False,
-					flux_limits_file=flux_limits_file,
-					C_aiming=self.C_aiming)
+				files=self.folder+'/flux-table',
+				efficiency=False,
+				maps_3D=False,
+				flux_map=False,
+				flow_paths=True,
+				saveloc=None,
+				billboard=False,
+				flux_limits_file=flux_limits_file,
+				C_aiming=self.C_aiming)
+
 		return results,aiming_results,Strt
 
 	def simple_HT_model(self, T_amb, V_wind, flux_table):
 		"""
-		The receiver thermal model
+		Function to retrieve the receiver efficiency
+		at off-design conditions.
+		Inputs:
+			T_amb:                Ambient temperature [deg C]
+			V_wind:               Wind velocity [m/s]
+			flux_table:           csv file with the flux on the receiver surface
+		Output:
+			eff_rec:              Receiver efficiency [-]
 		"""
 		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity'
 		rec = Cyl_receiver(
@@ -220,6 +328,9 @@ class one_key_start:
 					flux_limits_file=flux_limits_file,
 					C_aiming=self.C_aiming)
 		print('Receiver efficiency: %s'%(eff_rec))
+		
+		# Retrieving the receiver efficiency
+		return eff_rec
 
 	def aiming_loop(self,C_aiming,Exp,A_f):
 		"""
@@ -251,7 +362,7 @@ class one_key_start:
 				phi=self.phi,
 				elevation=self.elevation,
 				att_factor=att_factor,
-				num_rays=5000000,
+				num_rays=self.num_rays,
 				csv=self.csv_aiming)
 
 		# Optical postprocessing

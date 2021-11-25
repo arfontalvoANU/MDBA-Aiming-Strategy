@@ -13,6 +13,23 @@ from run_solstice import *
 from python_postprocessing import *
 from flux_reader import *
 
+def runSOLSTICE(azimuth,elevation,yaml_folder,simul_folder,num_rays):
+	'''
+	The scrip to run SOLSTICE with the user-defined sun positions:
+		azimuth:      Solar azimuth
+		elevation:    Solar elevation
+	'''
+
+	os.system('solstice -D%s,%s -v -n %s -R %s/demo-rcv.yaml -fo %s/simul %s/demo.yaml'%(
+		azimuth,
+		elevation,
+		int(num_rays),
+		yaml_folder,
+		simul_folder,
+		yaml_folder
+		)
+		)
+
 if __name__=='__main__':
 	# define a unique case folder for the user
 	snum = 0
@@ -47,9 +64,7 @@ if __name__=='__main__':
 	DNI=980.0             # Beam irradiance [W/m2]
 	num_fp=8              # Two panels per flow path (num_bundle/2)
 	D0=60.33              # Panel tube OD [mm]
-	num_rays_1=int(5e6)
-	mainfolder_1=basefolder
-	csv_1='%s/pos_and_aiming_new.csv'%basefolder
+	num_rays=int(5e6)
 
 	Model=aiming.one_key_start(
 		folder,
@@ -96,30 +111,19 @@ if __name__=='__main__':
 	if (azimuth>=360.0 or azimuth<0.0):
 		azimuth = (azimuth+360.0)%(360.0)
 
-	att_factor=Model.attenuation(Model.csv_trimmed)
-
-	scene=SolsticeScene(
-		mainfolder=basefolder,
-		num_rays=num_rays_1,
-		dni=DNI,
-		azimuth=azimuth,
-		zenith=elevation,
-		att_factor=att_factor,
-		csv=csv_1,
-		tower_h=tower_h,
-		r_cyl=num_fp,
-		h_cyl=r_height,
-		num_bundle=num_bundle
-	)
-
-	casefolder = basefolder + '/pos'
+	# creating a case folder for each new simul file
+	designfolder = '%s/vtk'%basefolder
+	casefolder = '%s/pos'%basefolder
 	if not os.path.exists(casefolder):
 		os.makedirs(casefolder)
 
-	scene.gen_YAML()
-	scene.runSOLSTICE(
-		savefile=casefolder,
-		view=True)
+	runSOLSTICE(
+		azimuth,
+		Model.elevation,
+		designfolder,
+		casefolder,
+		num_rays
+		)
 
 	# Optical postprocessing
 	eta,q_results,eta_exc_intec=proces_raw_results(
