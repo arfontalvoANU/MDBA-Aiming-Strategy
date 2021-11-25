@@ -173,7 +173,7 @@ class one_key_start:
 					C_aiming=self.C_aiming)
 		return results,aiming_results,Strt
 
-	def simple_HT_model(self, T_amb, V_wind):
+	def simple_HT_model(self, T_amb, V_wind, flux_table):
 		"""
 		The receiver thermal model
 		"""
@@ -192,7 +192,7 @@ class one_key_start:
 					)
 		Strt = rec.flow_path(
 					option='cmvNib%s'%self.num_fp,
-					fluxmap_file=self.folder+'/flux-table.csv'
+					fluxmap_file='%s/flux-table.csv'%flux_table
 					)
 		rec.balance(
 					HC=Na(),
@@ -201,9 +201,25 @@ class one_key_start:
 					T_out=565+273.15,
 					T_amb=T_amb+273.15,
 					h_conv_ext='SK',
-					filesave=self.folder+'/flux-table',
+					filesave='%s/flux-table'%flux_table,
 					air_velocity=V_wind
 					)
+		flux_limits_file = \
+					'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
+					self.source,
+					flux_folder,
+					round(self.D0,2))
+		eff_rec = simple_tower_receiver_plots(
+					files='%s/flux-table'%flux_table,
+					efficiency=False,
+					maps_3D=False,
+					flux_map=False,
+					flow_paths=True,
+					saveloc=None,
+					billboard=False,
+					flux_limits_file=flux_limits_file,
+					C_aiming=self.C_aiming)
+		print('Receiver efficiency: %s'%(eff_rec))
 
 	def aiming_loop(self,C_aiming,Exp,A_f):
 		"""

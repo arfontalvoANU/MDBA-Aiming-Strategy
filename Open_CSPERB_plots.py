@@ -630,6 +630,66 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		aiming_results=[Success,Positive,A_over,C_safe,C_net,S_ratio]
 	return results,aiming_results,vel_max
 
+def simple_tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None):
+	print "plotting"
+	fileo = open(files,'r')
+	data = pickle.load(fileo)
+	fileo.close()
+	if saveloc == None:
+		saveloc = files
+
+	height = data['height']
+	n_banks = data['n_banks']
+	n_elems = data['n_elems']
+	n_tubes = data['n_tubes']
+	D_tubes_o = data['D_tubes_o']
+	D_tubes_i = data['D_tubes_i'] 
+	eff_abs = data['eff_abs'] 
+	abs_t = data['abs_t']
+	eff_ems = data['eff_ems']
+	ems_t = data['ems_t']
+	k_t = data['k_t']
+	if billboard:
+		width = data['width']
+		ahr = data['wh']
+		ahr_map = data['wh_map']
+	else:
+		radius = data['radius']
+		ahr = data['ahr']
+		ahr_map = data['ahr_map']
+	fp = data['fp']
+	areas = data['areas']
+	areas_fp = data['areas_fp']
+	HC = data['HC']
+	T_in = data['T_in']
+	T_out = data['T_out']
+	h_conv_ext = data['h_conv_ext']
+	h = data['h'] 
+	m = data['m']
+	flux_in = data['flux_in']
+	q_net = data['q_net']
+	q_rad = data['q_rad']
+	q_ref = data['q_ref']
+	q_conv = data['q_conv_ext']
+	T_amb = data['T_amb']
+	T_HC = data['T_HC']
+	T_w_int = data['T_w_int']
+	T_ext = data['T_ext']
+	h_conv_int = data['h_conv_int']
+	V = data['V']
+	fluxmap = data['fluxmap']
+	HC = data['HC']
+	n_tubes = data['n_tubes']
+	Dp = data['Dp'] 
+	pipe_lengths = data['pipe_lengths']
+	Strt=data['Strt']
+	#maxheight = N.amax(ahr[:,1,:])
+	#maxrad = N.amax(ahr[:,2,:])
+	
+	plt.rc('font', size=8)
+	eff_rec=N.sum(q_net)/N.sum(fluxmap*areas[ahr_map])
+	return eff_rec
+
 def flow_path_plot(files='/home/charles/Documents/Boulot/These/Sodium receiver_CMI/ref_case_result_1', fps=[0], saveloc=None, flux_limits_file=None):
 
 	import matplotlib.gridspec as gridspec

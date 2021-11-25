@@ -9,20 +9,48 @@ sys.path.insert(0, parentdir)
 
 import onekey_aiming as aiming
 from simulation import optical
+from run_solstice import *
+from python_postprocessing import *
+from flux_reader import *
 
 if __name__=='__main__':
-	folder=currentdir
+	# define a unique case folder for the user
+	snum = 0
+	suffix = ""
+	while 1:
+		import datetime
+		dt = datetime.datetime.now()
+		ds = dt.strftime("%a-%H-%M")
+		basefolder = os.path.join(os.getcwd(),'case-%s%s'%(ds,suffix))
+		if os.path.exists(basefolder):
+			snum+=1
+			suffix = "-%d"%(snum,)
+			if snum > 200:
+				raise RuntimeError("Some problem with creating basefolder")
+		else:
+			# good, we have a new case dir
+			break
+
+	if not os.path.exists(basefolder):
+		os.makedirs(basefolder)
+
+	folder=basefolder
+	os.system("cp pos_and_aiming.csv %s"%(basefolder))
 	source_path=parentdir
-	num_bundle=16		#Number of panels
-	r_height=24.		#
-	r_diameter=16.		#
-	bins=50				#Vertical bins
-	tower_h=175.		#tower height
-	phi=0.0				#solar azimuth angle
-	elevation=55.15	#solar elevation angle
-	DNI=980.0			#Beam irradiance
-	num_fp=num_bundle/2	#Two panels per flow path
-	D0=60.33				#Panel tube OD
+	num_bundle=16         # Number of panels
+	r_height=24.0         # Receiver height [m]
+	r_diameter=16.0       # Receiver diameter [m]
+	bins=50               # Vertical bins
+	tower_h=175.0         # Tower height [m]
+	phi=0.0               # Solar azimuth angle [degrees]
+	elevation=55.15       # Solar elevation angle [degrees]
+	DNI=980.0             # Beam irradiance [W/m2]
+	num_fp=8              # Two panels per flow path (num_bundle/2)
+	D0=60.33              # Panel tube OD [mm]
+	num_rays_1=int(5e6)
+	mainfolder_1=basefolder
+	csv_1='%s/pos_and_aiming_new.csv'%basefolder
+
 	Model=aiming.one_key_start(
 		folder,
 		source_path,
@@ -37,7 +65,6 @@ if __name__=='__main__':
 		DNI,
 		D0)
 	Model.New_search_algorithm()
-	#Model.simple_HT_model(10,0.7)
 
 	ndec=5
 	nhra=13
@@ -60,42 +87,56 @@ if __name__=='__main__':
 			phi = -(90 + phi)
 			if (phi>=360.0 or phi<0.0):
 				phi = (phi+360.0)%(360.0)
-#			print(phi,elevation)
 			azi.append(phi)
 			ele.append(elevation)
 	azi = np.array(azi)
 	ele = np.array(ele)
 
-	sim = optical(
-					Dec,
-					Hra,
-					azi,
-					ele,
-					rec_slices=num_bundle,
-					rec_stacks=bins,
-					rec_diameter=r_diameter,
-					rec_height=r_height,
-					DNI=DNI,
-					sunshape='pillbox',
-					half_angle_deg = np.degrees(4.65e-3),
-					csr = 0.000002,			#Same as Shuang
-					num_rays=5e6,				#Same as Shuang
-					layoutfile = Model.csv_aiming,
-					rec_pos_x=0.,
-					rec_pos_y=0.,
-					rec_pos_z=tower_h+0.5*r_height,
-					rec_abs=0.98,
-					receiver='cylinder',
-					hemisphere='North',
-					hst_w=12.2,             #Same as Shuang
-					hst_h=12.2,             #Same as Shuang
-					rho_refl=0.90,          #Same as Shuang
-					slope_error=1.5e-3,     #Same as Shuang
-					tower_h=tower_h,
-					tower_r=0.01)
-	#sim.sim_group(userdefinedfolder=True,folder='OELT')
-	sim.sim_single(
-					azimuth=Model.phi,                 #solar azimuth angle
-					elevation=Model.elevation,         #solar elevation angle
-					userdefinedfolder=False,
-					folder='OELT')
+	azimuth=270.0 - Model.phi
+	if (azimuth>=360.0 or azimuth<0.0):
+		azimuth = (azimuth+360.0)%(360.0)
+
+	att_factor=Model.attenuation(Model.csv_trimmed)
+
+	scene=SolsticeScene(
+		mainfolder=basefolder,
+		num_rays=num_rays_1,
+		dni=DNI,
+		azimuth=azimuth,
+		zenith=elevation,
+		att_factor=att_factor,
+		csv=csv_1,
+		tower_h=tower_h,
+		r_cyl=num_fp,
+		h_cyl=r_height,
+		num_bundle=num_bundle
+	)
+
+	casefolder = basefolder + '/pos'
+	if not os.path.exists(casefolder):
+		os.makedirs(casefolder)
+
+	scene.gen_YAML()
+	scene.runSOLSTICE(
+		savefile=casefolder,
+		view=True)
+
+	# Optical postprocessing
+	eta,q_results,eta_exc_intec=proces_raw_results(
+			'%s/simul'%casefolder,
+			casefolder)
+	eff_interception=eta/eta_exc_intec
+	print 'Optical efficiency: %s'%(eta)
+
+	# Read flux map
+	read_data(
+			casefolder,
+			Model.r_height,
+			Model.r_diameter,
+			Model.num_bundle,
+			Model.bins,
+			flux_file=True
+			)
+
+	Model.simple_HT_model(20.0,0.0,casefolder)
+
