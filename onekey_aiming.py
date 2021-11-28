@@ -218,6 +218,7 @@ class one_key_start:
 		popt, pcov = curve_fit(func, xdata, ydata)
 		y2 = [func(i, popt[0]) for i in xdata]
 		att_factor =popt[0]
+		self.att_factor = att_factor
 		return att_factor
 
 	def HT_model(self, T_amb, V_wind):
@@ -283,7 +284,17 @@ class one_key_start:
 			V_wind:               Wind velocity [m/s]
 			flux_table:           csv file with the flux on the receiver surface
 		Output:
-			eff_rec:              Receiver efficiency [-]
+			results:              Results array
+				Qin:              Incident heat from solar field [MW]
+				eff_abs:          Absorption efficiency
+				eff_ems:          Emission efficiency
+				T_ext_mean:       Average external surface temperature
+				T4_ext_mean:      Average external surface temperature
+				h_ext:            External heat transfer coefficient
+				q_refl:           Reflection loss [MW]
+				q_emi:            Emission loss [MW]
+				q_conv:           Convection loss [MW]
+				eff_rec:          Receiver efficiency
 		"""
 		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity'
 		rec = Cyl_receiver(
@@ -317,7 +328,7 @@ class one_key_start:
 					self.source,
 					flux_folder,
 					round(self.D0,2))
-		eff_rec = simple_tower_receiver_plots(
+		results = simple_tower_receiver_plots(
 					files='%s/flux-table'%flux_table,
 					efficiency=False,
 					maps_3D=False,
@@ -327,10 +338,9 @@ class one_key_start:
 					billboard=False,
 					flux_limits_file=flux_limits_file,
 					C_aiming=self.C_aiming)
-		print('Receiver efficiency: %s'%(eff_rec))
 		
 		# Retrieving the receiver efficiency
-		return eff_rec
+		return results
 
 	def aiming_loop(self,C_aiming,Exp,A_f):
 		"""
@@ -442,7 +452,7 @@ class one_key_start:
 		f.write(",".join(map(str, C_aiming)))
 		f.write("\n")
 		f.close()
-		
+	
 	def fit_algorithm(self): 
 		"""
 		Optimisation of shape exponent and asymmetry factor

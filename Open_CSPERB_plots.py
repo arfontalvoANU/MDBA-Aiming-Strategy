@@ -688,7 +688,19 @@ def simple_tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=T
 	
 	plt.rc('font', size=8)
 	eff_rec=N.sum(q_net)/N.sum(fluxmap*areas[ahr_map])
-	return eff_rec
+	print 'Receiver efficiency: '+str(eff_rec)
+	# Qin, eff_abs,eff_ems,T_ext_mean,h_ext,q_refl,q_emi,q_conv,eff_rec
+	#print T_ext
+	#print N.average(T_ext),N.sqrt(N.sqrt(N.average(T_ext**4))),h_conv_ext
+	results=[N.sum(fluxmap*areas[ahr_map])/1e6,eff_abs,eff_ems,N.average(T_ext),N.sqrt(N.sqrt(N.average(T_ext**4))),h_conv_ext,N.sum(q_ref)/1e6,N.sum(q_rad)/1e6,N.sum(q_conv)/1e6,eff_rec]
+	
+	vel_max=N.array([])
+	for f in xrange(len(fp)):
+		vels = m[f]/n_tubes[fp[f]]/(N.pi*(D_tubes_i/2.)**2.*HC.rho(T_HC[f][1:]))
+		#print m[f],HC.rho(T_HC[f][1:]),vels
+		vel_max=N.append(vel_max,N.amax(vels))
+	#print vel_max
+	return results
 
 def flow_path_plot(files='/home/charles/Documents/Boulot/These/Sodium receiver_CMI/ref_case_result_1', fps=[0], saveloc=None, flux_limits_file=None):
 
