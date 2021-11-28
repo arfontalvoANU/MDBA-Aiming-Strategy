@@ -1,7 +1,10 @@
 import os
 import sys
 import inspect
+import datetime
 from solsticepy.cal_sun import *
+import colorama
+colorama.init()
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -13,13 +16,34 @@ from run_solstice import *
 from python_postprocessing import *
 from flux_reader import *
 
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def green(text):
+	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
 def runSOLSTICE(azimuth,elevation,yaml_folder,simul_folder,num_rays):
 	'''
 	The scrip to run SOLSTICE with the user-defined sun positions:
-		azimuth:      Solar azimuth
-		elevation:    Solar elevation
+	Inputs:
+		azimuth:                  Solar azimuth
+		elevation:                Solar elevation
+		yaml_folder:              Directory to the YAML input for SOLSTICE
+		simul_folder:             Directory to save the simul file
+		num_rays:                 Number of rays
+	Outputs:
+		simul:                    SOLSTICE text file saved in simul_folder
 	'''
 
+	print(yellow('solstice -D%s,%s -v -n %s -R %s/demo-rcv.yaml -fo %s/simul %s/demo.yaml'%(
+		azimuth,
+		elevation,
+		int(num_rays),
+		yaml_folder,
+		simul_folder,
+		yaml_folder
+		))
+		)
 	os.system('solstice -D%s,%s -v -n %s -R %s/demo-rcv.yaml -fo %s/simul %s/demo.yaml'%(
 		azimuth,
 		elevation,
@@ -35,10 +59,9 @@ if __name__=='__main__':
 	snum = 0
 	suffix = ""
 	while 1:
-		import datetime
 		dt = datetime.datetime.now()
 		ds = dt.strftime("%a-%H-%M")
-		basefolder = os.path.join(os.getcwd(),'case-%s%s'%(ds,suffix))
+		basefolder = os.path.join(currentdir,'case-%s%s'%(ds,suffix))
 		if os.path.exists(basefolder):
 			snum+=1
 			suffix = "-%d"%(snum,)
@@ -54,18 +77,21 @@ if __name__=='__main__':
 	folder=basefolder
 	os.system("cp pos_and_aiming.csv %s"%(basefolder))
 	source_path=parentdir
+
+	# Inputs
 	num_bundle=16         # Number of panels
 	r_height=24.0         # Receiver height [m]
 	r_diameter=16.0       # Receiver diameter [m]
 	bins=50               # Vertical bins
 	tower_h=175.0         # Tower height [m]
-	phi=0.0               # Solar azimuth angle [degrees]
+	azimuth=0.0           # Solar azimuth angle [degrees]
 	elevation=55.15       # Solar elevation angle [degrees]
 	DNI=980.0             # Beam irradiance [W/m2]
 	num_fp=8              # Two panels per flow path (num_bundle/2)
 	D0=60.33              # Panel tube OD [mm]
 	num_rays=int(5e6)
 
+	# Creating receiver model
 	Model=aiming.one_key_start(
 		folder,
 		source_path,
@@ -75,72 +101,80 @@ if __name__=='__main__':
 		r_diameter,
 		bins,
 		tower_h,
-		phi,
+		azimuth,
 		elevation,
 		DNI,
 		D0)
 	Model.New_search_algorithm()
 
+	# Annual discretisation
 	ndec=5
 	nhra=13
+	E = np.zeros((ndec, 2*nhra-1))
 	# Declination angle
 	Dec=np.linspace(-23.45, 23.45, num=ndec)
 	# Solar hour angle
 	Hra=np.linspace(-180., 0.0, num=nhra)
-	azi = []
-	ele = []
 	sun=SunPosition()
-	for dec in Dec:
-		for hra in Hra:
-			# Getting the azimuth angle, elevation angle and DNI
-			daytime,sunrise=sun.solarhour(dec, Model.latitude)
-			theta=sun.zenith(Model.latitude, dec, hra)
-			phi=sun.azimuth(Model.latitude, theta, dec, hra)
-			if theta > 90.0:
-				theta = 90.0
-			elevation=90.0-theta
-			phi = -(90 + phi)
-			if (phi>=360.0 or phi<0.0):
-				phi = (phi+360.0)%(360.0)
-			azi.append(phi)
-			ele.append(elevation)
-	azi = np.array(azi)
-	ele = np.array(ele)
-
-	azimuth=270.0 - Model.phi
-	if (azimuth>=360.0 or azimuth<0.0):
-		azimuth = (azimuth+360.0)%(360.0)
+	irow = 0
+	icol = 0
 
 	# creating a case folder for each new simul file
 	designfolder = '%s/vtk'%basefolder
-	casefolder = '%s/pos'%basefolder
-	if not os.path.exists(casefolder):
-		os.makedirs(casefolder)
 
-	runSOLSTICE(
-		azimuth,
-		Model.elevation,
-		designfolder,
-		casefolder,
-		num_rays
-		)
+	# Estimating the azimuth and elevation vectors
+	res=0
+	f = open('%s/OELT_verification.csv'%basefolder,'w+')
+	f.write('dec,hra,azi,ele,eta\n')
+	for irow,dec in enumerate(Dec):
+		for icol,hra in enumerate(Hra):
+			# Getting the azimuth angle, elevation angle and DNI
+			daytime,sunrise=sun.solarhour(dec, Model.latitude)
+			zen=sun.zenith(Model.latitude, dec, hra)
+			azi=sun.azimuth(Model.latitude, zen, dec, hra)
+			if zen > 90.0:
+				zen = 90.0
+			ele=90.0-zen
+			# Converting azimuth into SOLSTICE convention
+			azi = -(90 + azi)
+			if (azi>=360.0 or azi<0.0):
+				azi = (azi+360.0)%(360.0)
 
-	# Optical postprocessing
-	eta,q_results,eta_exc_intec=proces_raw_results(
-			'%s/simul'%casefolder,
-			casefolder)
-	eff_interception=eta/eta_exc_intec
-	print 'Optical efficiency: %s'%(eta)
+			if ele>0.0:
+				casefolder = '%s/pos_%s'%(basefolder,res)
+				if not os.path.exists(casefolder):
+					os.makedirs(casefolder)
 
-	# Read flux map
-	read_data(
-			casefolder,
-			Model.r_height,
-			Model.r_diameter,
-			Model.num_bundle,
-			Model.bins,
-			flux_file=True
-			)
+				runSOLSTICE(
+					azi,
+					ele,
+					designfolder,
+					casefolder,
+					num_rays
+					)
 
-	Model.simple_HT_model(20.0,0.0,casefolder)
+				# Optical postprocessing
+				eta,q_results,eta_exc_intec=proces_raw_results(
+						'%s/simul'%casefolder,
+						casefolder)
+				E[irow,icol] = eta
+				f.write('%s,%s,%s,%s,%s\n'%(dec,hra,azi,ele,eta))
+				res += 1
 
+				# Read flux map
+				read_data(
+						casefolder,
+						Model.r_height,
+						Model.r_diameter,
+						Model.num_bundle,
+						Model.bins,
+						flux_file=True
+						)
+
+	# Writting outputs to OELT file
+	f.close()
+	E[:,nhra:2*nhra-1]=np.fliplr(E)[:,nhra:2*nhra-1]
+	np.savetxt('%s/OELT.csv'%basefolder,E,fmt='%s', delimiter=',')
+
+#	# Getting the receiver efficiency
+#	Model.simple_HT_model(20.0,0.0,casefolder)
