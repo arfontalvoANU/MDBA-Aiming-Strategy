@@ -59,7 +59,7 @@ class one_key_start:
 		self.DNI=DNI
 		self.D0=D0
 		self.csv_aiming='%s/pos_and_aiming_new.csv' % self.folder
-		self.csv_trimmed='%s/pos_and_aiming.csv'%self.folder
+		self.csv_trimmed='%s/pos_and_aiming.csv'%self.source
 		self.latitude=lat
 		self.dis_delta=ndec
 		self.dis_omega=nhra
