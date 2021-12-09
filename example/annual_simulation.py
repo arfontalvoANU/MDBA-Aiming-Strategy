@@ -89,7 +89,7 @@ if __name__=='__main__':
 	DNI=980.0             # Beam irradiance [W/m2]
 	num_fp=8              # Two panels per flow path (num_bundle/2)
 	D0=60.33              # Panel tube OD [mm]
-	num_rays=int(5e6)
+	num_rays=int(5e6)     # Number of rays
 
 	# Creating receiver model
 	Model=aiming.one_key_start(
@@ -109,12 +109,12 @@ if __name__=='__main__':
 
 	# Annual discretisation
 	ndec=5
-	nhra=13
-	E = np.zeros((ndec, 2*nhra-1))
+	nhra=25
+	E = np.zeros((ndec, nhra))
 	# Declination angle
 	Dec=np.linspace(-23.45, 23.45, num=ndec)
 	# Solar hour angle
-	Hra=np.linspace(-180., 0.0, num=nhra)
+	Hra=np.linspace(-180.0, 180.0, num=nhra)
 	sun=SunPosition()
 	irow = 0
 	icol = 0
@@ -136,26 +136,36 @@ if __name__=='__main__':
 				zen = 90.0
 			ele=90.0-zen
 			# Converting azimuth into SOLSTICE convention
+			azimuth = azi
+			elevation = ele
 			azi = -(90 + azi)
 			if (azi>=360.0 or azi<0.0):
 				azi = (azi+360.0)%(360.0)
 
-			if ele>0.0:
-				casefolder = '%s/pos_%s'%(basefolder,res)
+			if ele>8.0:
+				casefolder = '%s/sunpos_%s'%(basefolder,res)
 				if not os.path.exists(casefolder):
 					os.makedirs(casefolder)
 
-				runSOLSTICE(
-					azi,
-					ele,
-					designfolder,
+				DNI = Model.get_I_Meinel(ele)
+				Model=aiming.one_key_start(
 					casefolder,
-					num_rays
-					)
+					source_path,
+					num_bundle,
+					num_fp,
+					r_height,
+					r_diameter,
+					bins,
+					tower_h,
+					azimuth,
+					elevation,
+					DNI,
+					D0)
+				Model.New_search_algorithm()
 
 				# Optical postprocessing
 				eta,q_results,eta_exc_intec=proces_raw_results(
-						'%s/simul'%casefolder,
+						'%s/vtk/simul'%casefolder,
 						casefolder)
 				E[irow,icol] = eta
 				f.write('%s,%s,%s,%s,%s\n'%(dec,hra,azi,ele,eta))
@@ -163,7 +173,7 @@ if __name__=='__main__':
 
 				# Read flux map
 				read_data(
-						casefolder,
+						'%s/vtk/'%casefolder,
 						Model.r_height,
 						Model.r_diameter,
 						Model.num_bundle,
@@ -173,8 +183,5 @@ if __name__=='__main__':
 
 	# Writting outputs to OELT file
 	f.close()
-	E[:,nhra:2*nhra-1]=np.fliplr(E)[:,nhra:2*nhra-1]
-	np.savetxt('%s/OELT.csv'%basefolder,E,fmt='%s', delimiter=',')
+	np.savetxt('%s/OELT.txt'%basefolder,E,fmt='%s', delimiter=',')
 
-#	# Getting the receiver efficiency
-#	Model.simple_HT_model(20.0,0.0,casefolder)
