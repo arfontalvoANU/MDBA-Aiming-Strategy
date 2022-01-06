@@ -526,6 +526,10 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 				size=12
 				plt.text(x=bank_lengths[30], y=1300, s='T%s'%(Strt[2*f]+1), ha='right',fontsize=size)
 				plt.text(x=bank_lengths[80], y=1000, s='T%s'%(Strt[2*f+1]+1), ha='right',fontsize=size)
+			elif len(fp)==2:
+				ax=plt.subplot(1, 2, f+1)
+				size=12
+				plt.text(x=bank_lengths[30], y=1300, s='f%s'%(f), ha='right',fontsize=size)
 			else:
 				ax=plt.subplot(int(len(fp)/4),4,f+1)
 				size=18

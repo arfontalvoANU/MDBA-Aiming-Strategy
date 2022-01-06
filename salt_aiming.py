@@ -61,7 +61,7 @@ class one_key_start:
 		self.DNI=DNI
 		self.D0=D0
 		self.csv_aiming='%s/pos_and_aiming_new.csv' % self.folder
-		self.csv_trimmed='%s/pos_and_aiming.csv'%self.folder
+		self.csv_trimmed='%s/pos_and_aiming_salt.csv'%self.source
 		self.latitude=lat
 		self.dis_delta=ndec
 		self.dis_omega=nhra
@@ -340,20 +340,20 @@ if __name__=='__main__':
 		os.makedirs(basefolder)
 
 	folder=basefolder
-	os.system("cp example/pos_and_aiming.csv %s"%(basefolder))
+	#os.system("cp example/pos_and_aiming.csv %s"%(basefolder))
 	source_path=os.getcwd()
 
 	# Inputs
-	num_bundle=16         # Number of panels
-	r_height=24.0         # Receiver height [m]
-	r_diameter=16.0       # Receiver diameter [m]
+	num_bundle=18         # Number of panels
+	r_height=10.5         # Receiver height [m]
+	r_diameter=8.5        # Receiver diameter [m]
 	bins=50               # Vertical bins
-	tower_h=175.0         # Tower height [m]
+	tower_h=114.75        # Tower height [m] (Floor to receiver bottom)
 	azimuth=0.0           # Solar azimuth angle [degrees]
 	elevation=55.15       # Solar elevation angle [degrees]
-	DNI=980.0             # Beam irradiance [W/m2]
+	DNI=950.0             # Beam irradiance [W/m2]
 	num_fp=2              # Number of flow path
-	D0=60.33              # Panel tube OD [mm]
+	D0=42.16              # Panel tube OD [mm]
 	num_rays=int(5e6)     # Number of rays
 
 	# Creating receiver model

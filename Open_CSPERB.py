@@ -409,9 +409,11 @@ class Cyl_receiver():
 				fp = N.zeros(N.shape(self.ahr)[0]/n_fp, dtype=int)
 				for b in xrange(self.n_banks/n_fp):
 					if f == 0:
+						strt = b
 						fploc = self.ahr_map[:,b+self.n_banks/n_fp]
 						fluxloc = self.ahr_map[:,b+self.n_banks/n_fp]
 					else: # reverse the rotation
+						strt = self.n_banks - b - 1
 						fploc = self.ahr_map[:,self.n_banks/n_fp-1-b]
 						fluxloc = self.ahr_map[:,self.n_banks/n_fp-1-b]
 					if b%2: # Reverse bank direction if odd bank.
@@ -420,6 +422,7 @@ class Cyl_receiver():
 
 					fp[b*self.n_elems:(b+1)*self.n_elems] = fploc
 					flux_fp[b*self.n_elems:(b+1)*self.n_elems] = flatmap[fluxloc]
+					Strt.append(strt)
 
 				self.fp.append(fp)
 				self.flux_fp.append(flux_fp)
