@@ -176,7 +176,7 @@ class one_key_start:
 				k_coating=1.2, 
 				D_coating_o=self.D0/1000.+45e-6)
 		Strt = rec.flow_path(
-				option='SEN-SWN',
+				option='cmvNib%s'%self.num_fp,
 				fluxmap_file=self.folder+'/flux-table.csv')
 		rec.balance(
 				HC=Solar_salt(),
@@ -275,6 +275,7 @@ class one_key_start:
 		Exp[:]=2.0
 		# Asymmetry factor
 		A_f=np.zeros(self.num_bundle)
+		A_f[:]=0.5
 		if self.num_bundle/self.num_fp == 1:
 			A_f[:]=0.75
 		elif self.num_bundle/self.num_fp == 2:
@@ -282,7 +283,7 @@ class one_key_start:
 			A_f[int(0.25*self.num_bundle):int(0.75*self.num_bundle)]=0.33
 
 		# New search algorithm
-		C_aiming[:]=0.5
+		C_aiming[:]=0.85
 		aiming_results,eff_interception,Strt=\
 				self.aiming_loop(C_aiming,Exp,A_f)
 		gap=0.05
@@ -321,21 +322,7 @@ class one_key_start:
 
 if __name__=='__main__':
 	# define a unique case folder for the user
-	snum = 0
-	suffix = ""
-	while 1:
-		dt = datetime.datetime.now()
-		ds = dt.strftime("%a-%H-%M")
-		basefolder = os.path.join(os.getcwd(),'case-%s%s'%(ds,suffix))
-		if os.path.exists(basefolder):
-			snum+=1
-			suffix = "-%d"%(snum,)
-			if snum > 200:
-				raise RuntimeError("Some problem with creating basefolder")
-		else:
-			# good, we have a new case dir
-			break
-
+	basefolder = os.path.join(os.getcwd(),'salt-case')
 	if not os.path.exists(basefolder):
 		os.makedirs(basefolder)
 
