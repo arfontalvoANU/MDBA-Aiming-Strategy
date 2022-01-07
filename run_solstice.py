@@ -44,12 +44,11 @@ class SolsticeScene:
 		self.num_rays=num_rays
 		self.dni=float(dni)
 		# heliostat related parameters
-		self.mirror_reflectivity=0.9
-		#self.slope=0.0014020
-		self.slope=0.0015
+		self.mirror_reflectivity=0.88
+		self.slope=0.0026
 		self.hst_dir=csv
-		self.hst_w=12.20
-		self.hst_h=12.20
+		self.hst_w=12.305
+		self.hst_h=9.752
 		self.att_factor=att_factor
 		self.tower_h=tower_h
 
