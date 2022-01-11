@@ -1,4 +1,8 @@
 import numpy as N
+import colorama
+colorama.init()
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
 class Na():
 	'''	
@@ -172,57 +176,39 @@ class Solar_salt():
 			Tlow = (T<self.Tmin)
 			Thigh = (T>self.Tmax)
 		if Tlow or Thigh:
-			print "Temperature of Solar Salt outside of correlations range"
+			print "Temperature of Solar Salt outside of correlations range: T_min=%s and T_max=%s"%(T.min(),T.max())
 			return False
 		else:
 			return True
 
 	def rho(self, T):
-		if self.check_valid(T):
-			TC = T-273.15
-			rho = 2090. - 0.636*TC
-			return rho
-		else:
-			return N.nan
+		TC = T-273.15
+		rho = 2090. - 0.636*TC
+		return rho
 
 	def mu(self, T):
-		if self.check_valid(T):
-			TC = T-273.15
-			mu = 2.2714e-2-1.2e-4*TC+2.281e-7*TC**2.-1.474e-10*TC**3.
-			return mu
-		else:
-			return N.nan
+		TC = T-273.15
+		mu = 2.2714e-2-1.2e-4*TC+2.281e-7*TC**2.-1.474e-10*TC**3.
+		return mu
 
 	def k(self, T):
-		if self.check_valid(T):
-			TC = T-273.15
-			k = 0.00019*TC + 0.443
-			return k
-		else:
-			return N.nan
+		TC = T-273.15
+		k = 0.00019*TC + 0.443
+		return k
 
 	def Cp(self, T):
-		if self.check_valid(T):
-			TC = T-273.15
-			Cp = 1443. + 0.172*TC
-			return Cp
-		else:
-			return N.nan
+		TC = T-273.15
+		Cp = 1443. + 0.172*TC
+		return Cp
 
 	def h(self, T):
-		if self.check_valid(T):
-			TC = T-273.15
-			h = 1443.*TC+0.172/2.*TC**2.
-			return h
-		else:
-			return N.nan
+		TC = T-273.15
+		h = 1443.*TC+0.172/2.*TC**2.
+		return h
 
 	def s(self, T):
-		if self.check_valid(T):
-			s = (1443.-0.172*273.15)*N.log(T) + 0.172*T
-			return s
-		else:
-			return N.nan
+		s = (1443.-0.172*273.15)*N.log(T) + 0.172*T
+		return s
 
 	def V_tube(self, mf_HC_tube, T, D_tube_in):
 		rho = self.rho(T)
@@ -264,6 +250,9 @@ class Solar_salt():
 
 			f_D = self.f_D(mf_HC_tube, T, D_tube_in)
 			Pr_w = self.Cp(T_w)*self.mu(T_w)/self.k(T_w)
+			varctrl = self.k(T_w)
+			if N.all(N.isnan(varctrl)):
+				print yellow("varctrl: %s"%str(N.all(N.isnan(varctrl))))
 			K = (Pr/Pr_w)**0.11
 			Nu_3 = ((f_D/8.)*(Re-1000.)*Pr/(1.+12.7*N.sqrt(f_D/8.)*(Pr**(2./3.)-1.)))*K # Gnielinski
 			Nu[Gnielinski] = Nu_3[Gnielinski]
