@@ -176,7 +176,7 @@ class one_key_start:
 				k_coating=1.2, 
 				D_coating_o=self.D0/1000.+45e-6)
 		Strt = rec.flow_path(
-				option='cmvNib%s'%self.num_fp,
+				option='NES-NWS',
 				fluxmap_file=self.folder+'/flux-table.csv')
 		rec.balance(
 				HC=Solar_salt(),
@@ -330,6 +330,34 @@ class one_key_start:
 			aiming_results,eff_interception,Strt=\
 				self.aiming_loop(C_aiming,Exp,A_f)
 
+	def sweeping_algorithm(self, C_start, E_start, A_start):
+		"""
+		An algorithm to sweep the aiming extent (C_aiming) from a start value to 2.0
+		
+		Parameters:
+		- C_start: Starting value for the aiming extent
+		- E_start: Starting value for the shape exponent
+		- A_start: Starting value for the asymmetry factor
+		
+		For equatorial aiming set C_start to 0.0
+		"""
+		C_aiming=np.zeros(self.num_bundle)                         # Aiming extent
+		Exp=np.zeros(self.num_bundle)                              # Shape exponent
+		A_f=np.zeros(self.num_bundle)                              # Asymmetry factor
+		# Initialising values
+		Exp[:]=E_start
+		A_f[:]=A_start
+		C_aiming[:]=C_start
+		# Sweeping algorithm for the aiming extent
+		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+		while np.all(aiming_results[1])==False and np.all(C_aiming<1.):
+			C_aiming[:] += 0.05
+			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+		while np.all(aiming_results[1])==False and np.all(C_aiming<2.0):
+			C_aiming[:] += 0.10
+			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+		self.sucess = np.all(aiming_results[1])
+
 if __name__=='__main__':
 	# define a unique case folder for the user
 	basefolder = os.path.join(os.getcwd(),'salt-case')
@@ -368,6 +396,9 @@ if __name__=='__main__':
 		DNI,
 		D0)
 
+	C_start = 0.5
+	E_start = 2.0
+	A_start = 0.5
 	# Running aiming for design point
-	Model.New_search_algorithm()
+	Model.sweeping_algorithm(C_start,E_start,A_start)
 
