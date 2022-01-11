@@ -261,6 +261,16 @@ class one_key_start:
 		print aiming_results[1]
 		return aiming_results,eff_interception,Strt
 
+	def get_I_Meinel(self,elevation):
+		"""
+		Meinel clear-sky model
+		"""
+		I0=1363.
+		zenith=90.-elevation
+		AM=1./np.cos(zenith/180.*np.pi)
+		I=I0*0.7**(AM**0.678)
+		return I
+
 	def New_search_algorithm(self):
 		"""
 		The net one-key algorithm to get the optimised aiming points
