@@ -370,12 +370,12 @@ class one_key_start:
 		C_aiming[:]=C_start
 		# Sweeping algorithm for the aiming extent
 		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
-		while np.all(aiming_results[1])==False and np.all(C_aiming<1.):
+		while np.all(aiming_results[1])==False and np.all(C_aiming<2.):
 			C_aiming[:] += 0.05
-			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
-		while np.all(aiming_results[1])==False and np.all(C_aiming<2.0):
-			C_aiming[:] += 0.10
-			aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+			try:
+				aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+			except ValueError:
+				pass
 		self.sucess = np.all(aiming_results[1])
 
 if __name__=='__main__':
