@@ -416,6 +416,37 @@ if __name__=='__main__':
 		DNI,
 		D0)
 
+	# Getting the azimuth angle, elevation angle and DNI
+	sun=SunPosition()
+	dec=0
+	hra=0
+	daytime,sunrise=sun.solarhour(dec, Model.latitude)
+	zen=sun.zenith(Model.latitude, dec, hra)
+	azi=sun.azimuth(Model.latitude, zen, dec, hra)
+	if zen > 90.0:
+		zen = 90.0
+	ele=90.0-zen
+	# Converting azimuth into SOLSTICE convention
+	azimuth = azi
+	elevation = ele
+	azi = -(90 + azi)
+	if (azi>=360.0 or azi<0.0):
+		azi = (azi+360.0)%(360.0)
+
+	DNI=Model.get_I_Meinel(ele)
+	Model=one_key_start(
+		folder,
+		source_path,
+		num_bundle,
+		num_fp,
+		r_height,
+		r_diameter,
+		bins,
+		tower_h,
+		azi,
+		ele,
+		DNI,
+		D0)
 	C_start = 0.5
 	E_start = 2.0
 	A_start = 0.5
