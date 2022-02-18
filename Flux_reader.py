@@ -52,9 +52,12 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 	
 	# fit to the style consistent with the receiver model
 	Flux_blender=np.zeros(num_elem,dtype=float)
-	Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
-	Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
-	
+	if num_bundle%4==0:
+		Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
+		Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
+	else:
+		Flux_blender[:int(0.25*num_elem+0.5*bins)]=Flux_rev[int(0.75*num_elem-0.5*bins):]
+		Flux_blender[int(0.25*num_elem+0.5*bins):]=Flux_rev[:int(0.75*num_elem-0.5*bins)]
 	
 	Flux=np.arange(bins*(num_bundle+1),dtype=float).reshape(bins,num_bundle+1)
 	#print Flux.shape

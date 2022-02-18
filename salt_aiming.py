@@ -22,7 +22,7 @@ from run_solstice import *
 class one_key_start:
 	def __init__(self, folder, source, num_bundle, num_fp, r_height,
 			r_diameter, bins, tower_h, phi, elevation, DNI, D0,
-			num_rays=5e6, lat=34.85, ndec=5, nhra=25):
+			num_rays=5e6, lat=34.85, ndec=5, nhra=25,abs_t=0.94,ems_t=0.88):
 		"""
 		Instantiation of a receiver object to adjust the aiming points
 		using the MDBA method from Wang et al. (2021)
@@ -68,6 +68,8 @@ class one_key_start:
 		self.dis_delta=ndec
 		self.dis_omega=nhra
 		self.num_rays=int(num_rays)
+		self.abs_t=abs_t
+		self.ems_t=ems_t
 
 	def run_SOLSTICE(self, dni, phi, elevation, att_factor, num_rays,csv, user_folder=False, ufolder='vtk'):
 		"""
@@ -170,11 +172,11 @@ class one_key_start:
 				radius=0.5*self.r_diameter, 
 				height=self.r_height,
 				n_banks=self.num_bundle,
-				n_elems=50,
+				n_elems=self.bins,
 				D_tubes_o=self.D0/1000.,
 				D_tubes_i=self.D0/1000.-2.*1.2e-3, 
-				abs_t=0.94, 
-				ems_t=0.88, 
+				abs_t=self.abs_t, 
+				ems_t=self.ems_t, 
 				k_coating=1.2, 
 				D_coating_o=self.D0/1000.+45e-6)
 		Strt = rec.flow_path(
@@ -256,7 +258,7 @@ class one_key_start:
 				self.bins,
 				flux_file=True)
 
-		flux = np.loadtxt('%s/flux-table.csv'%self.folder, skiprows=7, delimiter=',', usecols=np.arange(1,19))[::-1]
+		flux = np.loadtxt('%s/flux-table.csv'%self.folder, skiprows=7, delimiter=',', usecols=np.arange(1,self.num_bundle))[::-1]
 		flux = np.flip(flux,axis=0)
 		n_bins = np.shape(flux)[0]
 		n_pans = np.shape(flux)[1]
@@ -305,7 +307,6 @@ class one_key_start:
 		Exp[:]=2.0
 		# Asymmetry factor
 		A_f=np.zeros(self.num_bundle)
-		A_f[:]=0.5
 		if self.num_bundle/self.num_fp == 1:
 			A_f[:]=0.75
 		elif self.num_bundle/self.num_fp == 2:
@@ -313,7 +314,7 @@ class one_key_start:
 			A_f[int(0.25*self.num_bundle):int(0.75*self.num_bundle)]=0.33
 
 		# New search algorithm
-		C_aiming[:]=0.85
+		C_aiming[:]=0.5
 		aiming_results,eff_interception,Strt=\
 				self.aiming_loop(C_aiming,Exp,A_f)
 		gap=0.05
@@ -361,17 +362,31 @@ class one_key_start:
 		
 		For equatorial aiming set C_start to 0.0
 		"""
-		C_aiming=np.zeros(self.num_bundle)                         # Aiming extent
-		Exp=np.zeros(self.num_bundle)                              # Shape exponent
-		A_f=np.zeros(self.num_bundle)                              # Asymmetry factor
 		# Initialising values
-		Exp[:]=E_start
-		A_f[:]=A_start
-		C_aiming[:]=C_start
+		C_aiming=C_start*np.ones(self.num_bundle)                         # Aiming extent
+		Exp=E_start*np.ones(self.num_bundle)                       # Shape exponent
+		A_f=A_start*np.ones(self.num_bundle)                       # Asymmetry factor
+
+		# Trying the starting values
+		isuccessful = False
+		while np.all(C_aiming<2.) and not isuccessful:
+			try:
+				aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
+				isuccessful = True
+				print('Initialization successful')
+			except ValueError:
+				C_aiming[:] += 0.05
+		gap=0.05
 		# Sweeping algorithm for the aiming extent
-		aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 		while np.all(aiming_results[1])==False and np.all(C_aiming<2.):
-			C_aiming[:] += 0.05
+			for i in range(self.num_bundle):
+				if aiming_results[1][i]==False:
+					C_aiming[Strt[i]]+=gap
+					if Strt[i]==self.num_bundle-1:
+						C_aiming[0]+=gap
+					else:
+						C_aiming[Strt[i]+1]+=gap
+					C_aiming[Strt[i]-1]+=gap
 			try:
 				aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 			except ValueError:
