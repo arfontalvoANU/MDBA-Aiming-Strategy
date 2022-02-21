@@ -3,6 +3,9 @@ from sys import path
 from matplotlib import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import colorama
+colorama.init()
+
 plt.rcParams["font.family"] = "Times New Roman"
 
 '''
@@ -10,8 +13,16 @@ This vtk is read from SOLSTICE-included cylinder, not from Blender.
 Direction is: from East to N to W to S, from bottom to top.
 '''
 
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def green(text):
+	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
 def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_map=False):
+	num_bundle_old=num_bundle
+	if num_bundle%4!=0:
+		num_bundle=num_bundle*2
 	elem_area=r_diameter*np.sin(np.pi/num_bundle)*r_height/bins
 	simul='%s/vtk/simul' % folder
 	#print simul
@@ -52,12 +63,8 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 	
 	# fit to the style consistent with the receiver model
 	Flux_blender=np.zeros(num_elem,dtype=float)
-	if num_bundle%4==0:
-		Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
-		Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
-	else:
-		Flux_blender[:int(0.25*num_elem+0.5*bins)]=Flux_rev[int(0.75*num_elem-0.5*bins):]
-		Flux_blender[int(0.25*num_elem+0.5*bins):]=Flux_rev[:int(0.75*num_elem-0.5*bins)]
+	Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
+	Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
 	
 	Flux=np.arange(bins*(num_bundle+1),dtype=float).reshape(bins,num_bundle+1)
 	#print Flux.shape
@@ -66,6 +73,13 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 		for j in range(1,num_bundle+1):
 			Flux[i,j]=Flux_blender[bins*(j-1)+i]
 			#print i,j,Flux[i,j],bins*(j-1)+i
+	Flux_old = Flux
+	if num_bundle_old%4!=0:
+		num_bundle = num_bundle_old
+		Flux = np.zeros((bins,num_bundle+1))
+		Flux[:,0] = Flux_old[:,0]
+		for i in range(num_bundle):
+			Flux[:,i+1] = np.average(Flux_old[:,2*i+1:2*i+2],axis=1)
 	if flux_file==True:
 		title=np.array(7*(num_bundle+1))
 		title=np.array(['Flux intensity plot (units kW/m2)'])
@@ -109,10 +123,8 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 		plt.savefig(open('%s/flux_map.png'%folder,'w'), dpi=400)
 		plt.clf()
 		plt.close(fig)
-		
-	print max_flux
+	print yellow('    Max. flux: %s'%max_flux)
 	return max_flux
-	
 
 if __name__=='__main__':
 	folder=path[0]

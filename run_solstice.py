@@ -60,6 +60,8 @@ class SolsticeScene:
 		self.rec_slice=100
 		self.h_cyl=h_cyl
 		self.r_cyl=r_cyl
+		if num_bundle%4!=0:
+			num_bundle=num_bundle*2
 		self.num_bundle=num_bundle
 
 	def gen_YAML(self):

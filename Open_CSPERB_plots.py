@@ -10,6 +10,18 @@ from scipy.interpolate import interp2d
 from pandas import DataFrame
 from sklearn import linear_model
 
+import colorama
+colorama.init()
+
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def green(text):
+	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def magenta(text):
+	return colorama.Fore.MAGENTA + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
 def flux_limits(mf, Ts, flux_limits_file):
 	# Net flux limits in W.m2 for Ts in K and for mass flows of 1 to 5 kg/s in OD 60.3 mm 740H pipes with 1.2 mm wall thickness.
 	data = N.loadtxt(flux_limits_file, delimiter=',')
@@ -31,7 +43,7 @@ def flux_limits_V(V, Ts, flux_limits_file):
 	return flux_lim[:,0]
 	
 def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None):
-	print "plotting"
+	print magenta('    plotting')
 	fileo = open(files,'r')
 	data = pickle.load(fileo)
 	fileo.close()
@@ -88,7 +100,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 	
 	plt.rc('font', size=8)
 	eff_rec=N.sum(q_net)/N.sum(fluxmap*areas[ahr_map])
-	print 'Receiver efficiency: '+str(eff_rec)
+	print yellow('    Receiver efficiency: %s'%eff_rec)
 	# Qin, eff_abs,eff_ems,T_ext_mean,h_ext,q_refl,q_emi,q_conv,eff_rec
 	#print T_ext
 	#print N.average(T_ext),N.sqrt(N.sqrt(N.average(T_ext**4))),h_conv_ext
@@ -635,7 +647,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 	return results,aiming_results,vel_max
 
 def simple_tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None):
-	print "plotting"
+	print magenta('    plotting')
 	fileo = open(files,'r')
 	data = pickle.load(fileo)
 	fileo.close()
@@ -710,7 +722,7 @@ def flow_path_plot(files='/home/charles/Documents/Boulot/These/Sodium receiver_C
 
 	import matplotlib.gridspec as gridspec
 
-	print "plotting"
+	print magenta('    plotting')
 	fileo = open(files,'r')
 	data = pickle.load(fileo)
 	fileo.close()
@@ -1004,7 +1016,7 @@ def flow_path_plot_billboard(files='/home/charles/Documents/Boulot/These/Sodium 
 
 	import matplotlib.gridspec as gridspec
 
-	print "plotting"
+	print magenta('    plotting')
 	fileo = open(files,'r')
 	data = pickle.load(fileo)
 	fileo.close()

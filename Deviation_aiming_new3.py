@@ -45,6 +45,8 @@ def return_metric(N_hst,A):
 	return Metric
 
 def aiming(folder,r_height,r_diameter,C_aiming,csv,tower_h,num_bundle,Exp,A_f):
+#	if num_bundle%4!=0:
+#		num_bundle=num_bundle*2
 	#print C_aiming
 	title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 	r_radius=0.5*r_diameter

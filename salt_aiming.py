@@ -19,6 +19,18 @@ from cal_sun import *
 from scipy import interpolate
 from run_solstice import *
 
+import colorama
+colorama.init()
+
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def green(text):
+	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def magenta(text):
+	return colorama.Fore.MAGENTA + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
 class one_key_start:
 	def __init__(self, folder, source, num_bundle, num_fp, r_height,
 			r_diameter, bins, tower_h, phi, elevation, DNI, D0,
@@ -247,7 +259,7 @@ class one_key_start:
 				'%s/vtk/simul'% self.folder,
 				'%s/vtk'% self.folder)
 		eff_interception=eta/eta_exc_intec
-		print 'Interception efficiency: ' + str(eff_interception)
+		print yellow('    Interception efficiency: %s'%eff_interception)
 
 		# Read flux map
 		read_data(
@@ -256,31 +268,32 @@ class one_key_start:
 				self.r_diameter,
 				self.num_bundle,
 				self.bins,
-				flux_file=True)
+				flux_file=True,
+				flux_map=True)
 
-		flux = np.loadtxt('%s/flux-table.csv'%self.folder, skiprows=7, delimiter=',', usecols=np.arange(1,self.num_bundle))[::-1]
-		flux = np.flip(flux,axis=0)
-		n_bins = np.shape(flux)[0]
-		n_pans = np.shape(flux)[1]
-		x = np.linspace(-180,180,n_pans)
-		y = np.linspace(0,100,n_bins)
-		xx,yy = np.meshgrid(x,y)
-		fig, axes = plt.subplots(1,1)
-		axes.set_xlabel('Azimuth angle (Degree)',fontsize=14)
-		axes.set_ylabel('Receiver height (%)',fontsize=14)
-		im = axes.pcolormesh(xx, yy, flux, cmap=cm.inferno)
-		cbar3=fig.colorbar(im, ax=axes)
-		cbar3.set_label('Flux [kW.m$^{-2}$]',fontsize=12)
-		axes.tick_params(axis='both', which='major', labelsize=12)
-		axes.set_xlim([-180,180])
-		axes.set_ylim([0,100])
-		plt.savefig('%s/flux_2D.png'%self.folder)
+#		flux = np.loadtxt('%s/flux-table.csv'%self.folder, skiprows=7, delimiter=',', usecols=np.arange(1,self.num_bundle))[::-1]
+#		flux = np.flip(flux,axis=0)
+#		n_bins = np.shape(flux)[0]
+#		n_pans = np.shape(flux)[1]
+#		x = np.linspace(-180,180,n_pans)
+#		y = np.linspace(0,100,n_bins)
+#		xx,yy = np.meshgrid(x,y)
+#		fig, axes = plt.subplots(1,1)
+#		axes.set_xlabel('Azimuth angle (Degree)',fontsize=14)
+#		axes.set_ylabel('Receiver height (%)',fontsize=14)
+#		im = axes.pcolormesh(xx, yy, flux, cmap=cm.inferno)
+#		cbar3=fig.colorbar(im, ax=axes)
+#		cbar3.set_label('Flux [kW.m$^{-2}$]',fontsize=12)
+#		axes.tick_params(axis='both', which='major', labelsize=12)
+#		axes.set_xlim([-180,180])
+#		axes.set_ylim([0,100])
+#		plt.savefig('%s/flux_2D.png'%self.folder)
 
 		# Thermal simulation
 		results,aiming_results,Strt=self.HT_model(20.,0.)
 
 		# Print aiming_results
-		print aiming_results[1]
+		print yellow('    aiming result: %s'%str(aiming_results[1]))
 		return aiming_results,eff_interception,Strt
 
 	def get_I_Meinel(self,elevation):
@@ -373,7 +386,7 @@ class one_key_start:
 			try:
 				aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 				isuccessful = True
-				print('Initialization successful')
+				print magenta('    Initialization successful')
 			except ValueError:
 				C_aiming[:] += 0.05
 		gap=0.05
