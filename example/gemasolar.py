@@ -30,7 +30,7 @@ class gemasolar:
 		num_bundle=18, r_height=10.5, r_diameter=8.5, bins=50,
 		tower_h=114.75, azimuth=0.0, elevation=52.38, DNI=950.0,
 		num_fp=2, D0=22.40, num_rays=int(5e6), latitude=37.56,
-		testcase='gemasolar',new_algorithm=False):
+		testcase='case-gemasolar',new_algorithm=False):
 
 		self.num_bundle=num_bundle         # Number of panels
 		self.r_height=r_height             # Receiver height [m]
@@ -74,7 +74,7 @@ class gemasolar:
 		DNI_ratio=[1.39,1.00,0.87,0.56]
 
 		# define a unique case folder for the user
-		self.basefolder = os.path.join(currentdir,'%s_%s'%(self.testcase,ratio))
+		self.basefolder = os.path.join(currentdir,'%s/DNI_ratio_%s'%(self.testcase,ratio))
 
 		if not os.path.exists(self.basefolder):
 			os.makedirs(self.basefolder)
@@ -92,26 +92,26 @@ class gemasolar:
 		Model.sweeping_algorithm(C_start,E_start,A_start)
 
 		# Annual discretisation
-		ndec=5
-		nhra=25
-		E = np.zeros((ndec, nhra))
+		self.ndec=5
+		self.nhra=25
+		E = np.zeros((self.ndec, self.nhra))
 		# Declination angle
-		Dec=np.linspace(-23.45, 23.45, num=ndec)
+		self.Dec=np.linspace(-23.45, 23.45, num=self.ndec)
 		# Solar hour angle
-		Hra=np.linspace(-180.0, 180.0, num=nhra)
+		self.Hra=np.linspace(-180.0, 180.0, num=self.nhra)
 		sun=SunPosition()
 		irow = 0
 		icol = 0
 
-		# creating a case folder for each new simul file
-		designfolder = '%s/vtk'%self.basefolder
-
+		self.sunpos = []
+		self.irow = []
+		self.icol = []
 		# Estimating the azimuth and elevation vectors
 		res=0
-		f = open('%s/OELT_verification.csv'%self.basefolder,'a')
+		f = open('%s/OELT_verification.csv'%(self.basefolder),'a')
 		f.write('res,dec,hra,azi,ele,eta,sucess\n')
-		for irow,dec in enumerate(Dec):
-			for icol,hra in enumerate(Hra):
+		for irow,dec in enumerate(self.Dec):
+			for icol,hra in enumerate(self.Hra):
 				# Getting the azimuth angle, elevation angle and DNI
 				daytime,sunrise=sun.solarhour(dec, Model.latitude)
 				zen=sun.zenith(Model.latitude, dec, hra)
@@ -129,6 +129,9 @@ class gemasolar:
 				if ele>8.0:
 					DNI = DNI_ratio[ratio]*Model.get_I_Meinel(ele)
 					if res >= 0:
+						self.sunpos.append(res)
+						self.irow.append(irow)
+						self.icol.append(icol)
 						print(yellow('sunpos: %s\t DNI: %s'%(res,DNI)))
 						casefolder = '%s/sunpos_%s'%(self.basefolder,res)
 						if not os.path.exists(casefolder):
@@ -171,7 +174,49 @@ class gemasolar:
 
 		# Writting outputs to OELT file
 		f.close()
-		np.savetxt('%s/OELT.txt'%self.basefolder,E,fmt='%s', delimiter=',')
+		np.savetxt('%s/OELT.txt'%(self.basefolder),E,fmt='%s', delimiter=',')
+
+	def get_flux_lookup_tables(self,fpath):
+
+		N = int(self.num_bundle/self.num_fp*self.bins)
+
+		for ratio in range(4):
+			f = open('%s/flux_a230_salt_FP%s_DNIr%s.motab'%(self.basefolder,fpath,r),'w+')
+			f.write('#1\n')
+			E = np.zeros((self.ndec, self.nhra))
+			F = []
+			for k in range(N):
+				f.write('double flux_%s(%d,%d)\n'%(k+1, self.ndec+1, self.nhra+1))
+				f.write('0.0,')
+				for res,irow,icol in zip(self.sunpos,self.irow,self.icol):
+					filename = '%s/DNI_ratio_%s/sunpos_%s/flux-table'%(self.basefolder, ratio, res)
+					fileo = open(filename,'r')
+					data = pickle.load(fileo)
+					fileo.close()
+					areas = data['areas']
+					q_net = data['q_net']
+					fp = data['fp']
+					flux = q_net[fp[fpath-1]]/areas[fp[fpath-1]]/1e3
+					E[irow,icol] = flux[k]
+				x = np.linspace(-180.0, 180.0, self.nhra)
+				y = np.linspace(-23.45, 23.45, self.ndec)
+				for j in range(E.shape[1]):
+					f.write('%s'%(x[j]))
+					if j == E.shape[1]-1:
+						f.write('\n')
+					else:
+						f.write(',')
+				for i in range(E.shape[0]):
+					f.write('%s,'%y[i])
+					for j in range(E.shape[1]):
+							f.write('%s'%(E[i,j]))
+							if j == E.shape[1]-1:
+								f.write('\n')
+							else:
+								f.write(',')
+				f.write('\n')
+			#
+			f.close()
 
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Run representative sun positions of annual simulation for a specific DNI ratio')
