@@ -30,6 +30,7 @@ class gemasolar:
 		num_bundle=18, r_height=10.5, r_diameter=8.5, bins=50,
 		tower_h=114.75, azimuth=0.0, elevation=52.38, DNI=950.0,
 		num_fp=2, D0=22.40, num_rays=int(5e6), latitude=37.56,
+		ndec=5, nhra=25,
 		testcase='case-gemasolar',new_algorithm=False):
 
 		self.num_bundle=num_bundle         # Number of panels
@@ -46,11 +47,18 @@ class gemasolar:
 		self.latitude=latitude             # Plant latitude (Seville, Spain)
 		self.testcase=testcase             # Name of the case study
 		self.new_algorithm = new_algorithm
+		self.ndec=ndec
+		self.nhra=nhra
+		# Declination angle
+		self.Dec=np.linspace(-23.45, 23.45, num=self.ndec)
+		# Solar hour angle
+		self.Hra=np.linspace(-180.0, 180.0, num=self.nhra)
+		self.N = int(self.num_bundle/self.num_fp*self.bins)
 
 	def design_point(self,ratio,C_start,E_start,A_start):
 
 		# define a unique case folder for the user
-		self.basefolder = os.path.join(currentdir,'%s_%s'%(self.testcase,ratio))
+		self.basefolder = os.path.join(currentdir,'%s/DNI_ratio_%s'%(self.testcase,ratio))
 
 		if not os.path.exists(self.basefolder):
 			os.makedirs(self.basefolder)
@@ -72,151 +80,145 @@ class gemasolar:
 	def simulate_dni_ratio(self,ratio,C_start,E_start,A_start):
 
 		DNI_ratio=[1.39,1.00,0.87,0.56]
+		N_ratios = len(DNI_ratio)
 
-		# define a unique case folder for the user
-		self.basefolder = os.path.join(currentdir,'%s/DNI_ratio_%s'%(self.testcase,ratio))
+		for ratio in range(N_ratios):
+			# define a unique case folder for the user
+			self.basefolder = os.path.join(currentdir,'%s/DNI_ratio_%s'%(self.testcase,ratio))
 
-		if not os.path.exists(self.basefolder):
-			os.makedirs(self.basefolder)
+			if not os.path.exists(self.basefolder):
+				os.makedirs(self.basefolder)
 
-		self.folder=self.basefolder
-		self.source_path=parentdir
+			self.folder=self.basefolder
+			self.source_path=parentdir
 
-		# Creating receiver model
-		Model=aiming.one_key_start(
-			self.folder, self.source_path, self.num_bundle, self.num_fp,
-			self.r_height, self.r_diameter, self.bins, self.tower_h,
-			self.azimuth, self.elevation, self.DNI, self.D0,
-			lat=self.latitude)
+			# Creating receiver model
+			Model=aiming.one_key_start(
+				self.folder, self.source_path, self.num_bundle, self.num_fp,
+				self.r_height, self.r_diameter, self.bins, self.tower_h,
+				self.azimuth, self.elevation, self.DNI, self.D0,
+				lat=self.latitude)
 
-		Model.sweeping_algorithm(C_start,E_start,A_start)
+			Model.sweeping_algorithm(C_start,E_start,A_start)
 
-		# Annual discretisation
-		self.ndec=5
-		self.nhra=25
-		E = np.zeros((self.ndec, self.nhra))
-		# Declination angle
-		self.Dec=np.linspace(-23.45, 23.45, num=self.ndec)
-		# Solar hour angle
-		self.Hra=np.linspace(-180.0, 180.0, num=self.nhra)
-		sun=SunPosition()
-		irow = 0
-		icol = 0
-
-		self.sunpos = []
-		self.irow = []
-		self.icol = []
-		# Estimating the azimuth and elevation vectors
-		res=0
-		f = open('%s/OELT_verification.csv'%(self.basefolder),'a')
-		f.write('res,dec,hra,azi,ele,eta,sucess\n')
-		for irow,dec in enumerate(self.Dec):
-			for icol,hra in enumerate(self.Hra):
-				# Getting the azimuth angle, elevation angle and DNI
-				daytime,sunrise=sun.solarhour(dec, Model.latitude)
-				zen=sun.zenith(Model.latitude, dec, hra)
-				azi=sun.azimuth(Model.latitude, zen, dec, hra)
-				if zen > 90.0:
-					zen = 90.0
-				ele=90.0-zen
-				# Converting azimuth into SOLSTICE convention
-				azimuth = azi
-				elevation = ele
-				azi = -(90 + azi)
-				if (azi>=360.0 or azi<0.0):
-					azi = (azi+360.0)%(360.0)
-
-				if ele>8.0:
-					DNI = DNI_ratio[ratio]*Model.get_I_Meinel(ele)
-					if res >= 0:
-						self.sunpos.append(res)
-						self.irow.append(irow)
-						self.icol.append(icol)
-						print(yellow('sunpos: %s\t DNI: %s'%(res,DNI)))
-						casefolder = '%s/sunpos_%s'%(self.basefolder,res)
-						if not os.path.exists(casefolder):
-							os.makedirs(casefolder)
-						Model=aiming.one_key_start(
-							casefolder,
-							self.source_path,
-							self.num_bundle,
-							self.num_fp,
-							self.r_height,
-							self.r_diameter,
-							self.bins,
-							self.tower_h,
-							azimuth,
-							elevation,
-							DNI,
-							self.D0)
-						# Running aiming for design point
-						Model.sweeping_algorithm(C_start,E_start,A_start)
-
-						# Optical postprocessing
-						eta,q_results,eta_exc_intec=proces_raw_results(
-								'%s/vtk/simul'%casefolder,
-								casefolder)
-						E[irow,icol] = eta
-						f.write('%s,%s,%s,%s,%s,%s,%s\n'%(res,dec,hra,azi,ele,eta,str(Model.sucess)))
-						print(yellow('Sunpos %s -- Sucess %s'%(res,str(Model.sucess))))
-
-						# Read flux map
-						read_data(
-								'%s/vtk/'%casefolder,
-								Model.r_height,
-								Model.r_diameter,
-								Model.num_bundle,
-								Model.bins,
-								flux_file=True
-								)
-						#endif
-					res += 1
-
-		# Writting outputs to OELT file
-		f.close()
-		np.savetxt('%s/OELT.txt'%(self.basefolder),E,fmt='%s', delimiter=',')
-
-	def get_flux_lookup_tables(self,fpath):
-
-		N = int(self.num_bundle/self.num_fp*self.bins)
-
-		for ratio in range(4):
-			f = open('%s/flux_a230_salt_FP%s_DNIr%s.motab'%(self.basefolder,fpath,r),'w+')
-			f.write('#1\n')
+			# Annual discretisation
 			E = np.zeros((self.ndec, self.nhra))
-			F = []
-			for k in range(N):
-				f.write('double flux_%s(%d,%d)\n'%(k+1, self.ndec+1, self.nhra+1))
-				f.write('0.0,')
-				for res,irow,icol in zip(self.sunpos,self.irow,self.icol):
-					filename = '%s/DNI_ratio_%s/sunpos_%s/flux-table'%(self.basefolder, ratio, res)
-					fileo = open(filename,'r')
-					data = pickle.load(fileo)
-					fileo.close()
-					areas = data['areas']
-					q_net = data['q_net']
-					fp = data['fp']
-					flux = q_net[fp[fpath-1]]/areas[fp[fpath-1]]/1e3
-					E[irow,icol] = flux[k]
-				x = np.linspace(-180.0, 180.0, self.nhra)
-				y = np.linspace(-23.45, 23.45, self.ndec)
-				for j in range(E.shape[1]):
-					f.write('%s'%(x[j]))
-					if j == E.shape[1]-1:
-						f.write('\n')
-					else:
-						f.write(',')
-				for i in range(E.shape[0]):
-					f.write('%s,'%y[i])
-					for j in range(E.shape[1]):
-							f.write('%s'%(E[i,j]))
-							if j == E.shape[1]-1:
-								f.write('\n')
-							else:
-								f.write(',')
-				f.write('\n')
-			#
+			sun=SunPosition()
+			irow = 0
+			icol = 0
+
+			self.sunpos = []
+			self.irow = []
+			self.icol = []
+			# Estimating the azimuth and elevation vectors
+			res=0
+			f = open('%s/OELT_verification.csv'%(self.basefolder),'a')
+			f.write('res,dec,hra,azi,ele,eta,sucess\n')
+			for irow,dec in enumerate(self.Dec):
+				for icol,hra in enumerate(self.Hra):
+					# Getting the azimuth angle, elevation angle and DNI
+					daytime,sunrise=sun.solarhour(dec, Model.latitude)
+					zen=sun.zenith(Model.latitude, dec, hra)
+					azi=sun.azimuth(Model.latitude, zen, dec, hra)
+					if zen > 90.0:
+						zen = 90.0
+					ele=90.0-zen
+					# Converting azimuth into SOLSTICE convention
+					azimuth = azi
+					elevation = ele
+					azi = -(90 + azi)
+					if (azi>=360.0 or azi<0.0):
+						azi = (azi+360.0)%(360.0)
+
+					if ele>8.0:
+						DNI = DNI_ratio[ratio]*Model.get_I_Meinel(ele)
+						if res >= 0:
+							self.sunpos.append(res)
+							self.irow.append(irow)
+							self.icol.append(icol)
+							print(yellow('sunpos: %s\t DNI: %s'%(res,DNI)))
+							casefolder = '%s/sunpos_%s'%(self.basefolder,res)
+							if not os.path.exists(casefolder):
+								os.makedirs(casefolder)
+							Model=aiming.one_key_start(
+								casefolder,
+								self.source_path,
+								self.num_bundle,
+								self.num_fp,
+								self.r_height,
+								self.r_diameter,
+								self.bins,
+								self.tower_h,
+								azimuth,
+								elevation,
+								DNI,
+								self.D0)
+							# Running aiming for design point
+							Model.sweeping_algorithm(C_start,E_start,A_start)
+
+							# Optical postprocessing
+							eta,q_results,eta_exc_intec=proces_raw_results(
+									'%s/vtk/simul'%casefolder,
+									casefolder)
+							E[irow,icol] = eta
+							f.write('%s,%s,%s,%s,%s,%s,%s\n'%(res,dec,hra,azi,ele,eta,str(Model.sucess)))
+							print(yellow('Sunpos %s -- Sucess %s'%(res,str(Model.sucess))))
+
+							# Read flux map
+							read_data(
+									'%s/vtk/'%casefolder,
+									Model.r_height,
+									Model.r_diameter,
+									Model.num_bundle,
+									Model.bins,
+									flux_file=True
+									)
+							#endif
+						res += 1
+
+			# Writting outputs to OELT file
 			f.close()
+			np.savetxt('%s/OELT.txt'%(self.basefolder),E,fmt='%s', delimiter=',')
+			del E
+
+			for fpath in range(1,3):
+				# Writting the flux lookup table for this DNI ratio
+				f = open('%s/flux_a230_salt_FP%s_DNIr%s.motab'%(os.path.join(currentdir,self.testcase),fpath,ratio),'w+')
+				f.write('#1\n')
+				E = np.zeros((self.ndec, self.nhra))
+				F = []
+				for k in range(self.N):
+					f.write('double flux_%s(%d,%d)\n'%(k+1, self.ndec+1, self.nhra+1))
+					f.write('0.0,')
+					for res,irow,icol in zip(self.sunpos,self.irow,self.icol):
+						filename = '%s/sunpos_%s/flux-table'%(self.basefolder, res)
+						fileo = open(filename,'r')
+						data = pickle.load(fileo)
+						fileo.close()
+						areas = data['areas']
+						q_net = data['q_net']
+						fp = data['fp']
+						flux = q_net[fp[fpath-1]]/areas[fp[fpath-1]]/1e3
+						E[irow,icol] = flux[k]
+					x = np.linspace(-180.0, 180.0, self.nhra)
+					y = np.linspace(-23.45, 23.45, self.ndec)
+					for j in range(E.shape[1]):
+						f.write('%s'%(x[j]))
+						if j == E.shape[1]-1:
+							f.write('\n')
+						else:
+							f.write(',')
+					for i in range(E.shape[0]):
+						f.write('%s,'%y[i])
+						for j in range(E.shape[1]):
+								f.write('%s'%(E[i,j]))
+								if j == E.shape[1]-1:
+									f.write('\n')
+								else:
+									f.write(',')
+					f.write('\n')
+				#
+				f.close()
 
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Run representative sun positions of annual simulation for a specific DNI ratio')

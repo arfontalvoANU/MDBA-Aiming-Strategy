@@ -256,25 +256,8 @@ class one_key_start:
 				self.r_diameter,
 				self.num_bundle,
 				self.bins,
-				flux_file=True)
-
-		flux = np.loadtxt('%s/flux-table.csv'%self.folder, skiprows=7, delimiter=',', usecols=np.arange(1,self.num_bundle))[::-1]
-		flux = np.flip(flux,axis=0)
-		n_bins = np.shape(flux)[0]
-		n_pans = np.shape(flux)[1]
-		x = np.linspace(-180,180,n_pans)
-		y = np.linspace(0,100,n_bins)
-		xx,yy = np.meshgrid(x,y)
-		fig, axes = plt.subplots(1,1)
-		axes.set_xlabel('Azimuth angle (Degree)',fontsize=14)
-		axes.set_ylabel('Receiver height (%)',fontsize=14)
-		im = axes.pcolormesh(xx, yy, flux, cmap=cm.inferno)
-		cbar3=fig.colorbar(im, ax=axes)
-		cbar3.set_label('Flux [kW.m$^{-2}$]',fontsize=12)
-		axes.tick_params(axis='both', which='major', labelsize=12)
-		axes.set_xlim([-180,180])
-		axes.set_ylim([0,100])
-		plt.savefig('%s/flux_2D.png'%self.folder)
+				flux_file=True,
+				flux_map=True)
 
 		# Thermal simulation
 		results,aiming_results,Strt=self.HT_model(20.,0.)
