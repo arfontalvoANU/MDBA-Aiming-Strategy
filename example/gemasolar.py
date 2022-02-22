@@ -18,6 +18,7 @@ from flux_reader import *
 import pickle
 import argparse
 import matplotlib.pyplot as plt
+import time
 
 def yellow(text):
 	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
@@ -54,6 +55,8 @@ class gemasolar:
 		# Solar hour angle
 		self.Hra=np.linspace(-180.0, 180.0, num=self.nhra)
 		self.N = int(self.num_bundle/self.num_fp*self.bins)
+		self.DNI_ratio=[1.39,1.00,0.87,0.56]
+		self.N_ratios = len(self.DNI_ratio)
 
 	def design_point(self,ratio,C_start,E_start,A_start):
 
@@ -79,10 +82,8 @@ class gemasolar:
 
 	def simulate_dni_ratio(self,ratio,C_start,E_start,A_start):
 
-		DNI_ratio=[1.39,1.00,0.87,0.56]
-		N_ratios = len(DNI_ratio)
-
-		for ratio in range(N_ratios):
+		for ratio in range(self.N_ratios):
+			tinit = time.time()
 			# define a unique case folder for the user
 			self.basefolder = os.path.join(currentdir,'%s/DNI_ratio_%s'%(self.testcase,ratio))
 
@@ -131,7 +132,7 @@ class gemasolar:
 						azi = (azi+360.0)%(360.0)
 
 					if ele>8.0:
-						DNI = DNI_ratio[ratio]*Model.get_I_Meinel(ele)
+						DNI = self.DNI_ratio[ratio]*Model.get_I_Meinel(ele)
 						if res >= 0:
 							self.sunpos.append(res)
 							self.irow.append(irow)
@@ -181,6 +182,12 @@ class gemasolar:
 			np.savetxt('%s/OELT.txt'%(self.basefolder),E,fmt='%s', delimiter=',')
 			del E
 
+			# Print elapsed time
+			seconds = time.time() - tinit
+			m, s = divmod(seconds, 60)
+			h, m = divmod(m, 60)
+			print('Simulation time: {:d}:{:02d}:{:02d}'.format(int(h), int(m), int(s)))
+
 			for fpath in range(1,3):
 				# Writting the flux lookup table for this DNI ratio
 				f = open('%s/flux_a230_salt_FP%s_DNIr%s.motab'%(os.path.join(currentdir,self.testcase),fpath,ratio),'w+')
@@ -217,8 +224,42 @@ class gemasolar:
 								else:
 									f.write(',')
 					f.write('\n')
-				#
 				f.close()
+
+	def get_m_flow_lookup_tables(self):
+		for fpath in range(1,3):
+			f = open('%s/mflow_a230_salt_FP%s.motab'%(os.path.join(currentdir,self.testcase),fpath),'w+')
+			f.write('#1\n')
+			for ratio in range(self.N_ratios):
+				E = np.zeros((self.ndec, self.nhra))
+				f.write('double mflow_%s(%d,%d)\n'%(ratio, self.ndec+1, self.nhra+1))
+				f.write('0.0,')
+				for res,irow,icol in zip(self.sunpos, self.irow, self.icol):
+					filename = '%s/DNI_ratio_%s/sunpos_%s/flux-table'%(os.path.join(currentdir,self.testcase), ratio, res)
+					fileo = open(filename,'r')
+					data = pickle.load(fileo)
+					fileo.close()
+					mflow = data['m']
+					n_tubes = data['n_tubes']
+					E[irow,icol] = mflow[int(fpath)-1]/n_tubes[0]
+				x = np.linspace(-180.0, 180.0, self.nhra)
+				y = np.linspace(-23.45, 23.45, self.ndec)
+				for j in range(E.shape[1]):
+					f.write('%s'%(x[j]))
+					if j == E.shape[1]-1:
+						f.write('\n')
+					else:
+						f.write(',')
+				for i in range(E.shape[0]):
+					f.write('%s,'%y[i])
+					for j in range(E.shape[1]):
+							f.write('%s'%(E[i,j]))
+							if j == E.shape[1]-1:
+								f.write('\n')
+							else:
+								f.write(',')
+				f.write('\n')
+			f.close()
 
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Run representative sun positions of annual simulation for a specific DNI ratio')
@@ -236,4 +277,4 @@ if __name__=='__main__':
 		cyl_receiver.design_point(args.ratio, args.C_start, args.E_start, args.A_start)
 	else:
 		cyl_receiver.simulate_dni_ratio(args.ratio, args.C_start, args.E_start, args.A_start)
-	#get_m_flow_lookup_tables(args.fpath)
+		cyl_receiver.get_m_flow_lookup_tables()
