@@ -161,7 +161,7 @@ class gemasolar:
 								azimuth,
 								elevation,
 								DNI,
-								self.D0)
+								self.D0, lat=self.latitude)
 							# Running aiming for design point
 							Model.sweeping_algorithm(C_start,E_start,A_start)
 
@@ -324,7 +324,7 @@ class gemasolar:
 				azimuth,
 				elevation,
 				dni,
-				self.D0)
+				self.D0, lat=self.latitude)
 			# Running aiming for design point
 			Model.sweeping_algorithm(C_start,E_start,A_start)
 
