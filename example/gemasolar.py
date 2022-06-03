@@ -363,7 +363,7 @@ class gemasolar:
 		eff_abs=self.abs_t/(2./np.pi*(1.-self.abs_t)+self.abs_t) # effective absorptivity of the pipe
 		eff_emi=self.ems_t/(2./np.pi*(1.-self.ems_t)+self.ems_t) # effective emissivity of the pipe
 
-		R_input=np.loadtxt('%s/RLLT_input.csv' % fpath   ,delimiter=',', skiprows=1)
+		R_input=np.loadtxt('RLLT_input.csv',delimiter=',', skiprows=1)
 		R_output_old=np.loadtxt('%s/RLLT.csv' % fpath   ,delimiter=',', skiprows=1)
 		R_output=R_output_old[~np.isnan(R_output_old).any(axis=1)] # to remove the rows with nan
 		R_input=R_input[~np.isnan(R_output_old).any(axis=1)]
@@ -424,7 +424,7 @@ class gemasolar:
 		hra = np.linspace(-180.0,180.0,nhra)
 		eff_design = data[ndec-1,(nhra-1)/2+1]
 		# Creating motab text file
-		table = open('%s/gemasolar_H230_salt_MDBA.motab'%(os.path.join(currentdir,self.testcase)),'w+')
+		table = open('%s/gemasolar_H230_salt_MDBA_r%s.motab'%(os.path.join(currentdir,self.testcase),ratio),'w+')
 		# Writting headers
 		table.write('#1\n')
 		table.write('#Comments\n')
@@ -459,7 +459,7 @@ if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Run representative sun positions of annual simulation for a specific DNI ratio')
 	parser.add_argument('--ratio', type=int, default=1, help='DNI ratio to be simulated. Default=1')
 	parser.add_argument('--fpath', type=int, default=1, help='Flowpath data to be compiled. Default=1')
-	parser.add_argument('--C_start', type=float, default=0.0, help='The starting value of the aiming extent')
+	parser.add_argument('--C_start', type=float, default=0.5, help='The starting value of the aiming extent')
 	parser.add_argument('--E_start', type=float, default=2.0, help='The starting value of the aiming exponent')
 	parser.add_argument('--A_start', type=float, default=0.5, help='The starting value of the aiming asymetry factor')
 	parser.add_argument('--design', type=bool, default=False, help='Run only the design point')
