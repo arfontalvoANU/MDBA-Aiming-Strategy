@@ -262,6 +262,10 @@ class Solar_salt():
 			return N.nan
 		# Heat transfer coefficient:
 		u = Nu*k/(D_tube_in)
+		# Including fouling resistance
+		Rf = 8.808e-5
+		R = Rf + 1/u
+		u = 1/R
 		return u
 
 	def f_D(self, mf_HC_tube, T, D_tube_in, tube_roughness=45e-6):
