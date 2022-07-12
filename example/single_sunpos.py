@@ -10,11 +10,14 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-import onekey_aiming as aiming
+import salt_aiming as aiming
 from simulation import optical
 from run_solstice import *
 from python_postprocessing import *
 from flux_reader import *
+import pickle
+import argparse
+import matplotlib.pyplot as plt
 
 def yellow(text):
 	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
@@ -22,73 +25,28 @@ def yellow(text):
 def green(text):
 	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
-def runSOLSTICE(azimuth,elevation,yaml_folder,simul_folder,num_rays):
-	'''
-	The scrip to run SOLSTICE with the user-defined sun positions:
-	Inputs:
-		azimuth:                  Solar azimuth
-		elevation:                Solar elevation
-		yaml_folder:              Directory to the YAML input for SOLSTICE
-		simul_folder:             Directory to save the simul file
-		num_rays:                 Number of rays
-	Outputs:
-		simul:                    SOLSTICE text file saved in simul_folder
-	'''
+def simulate_dni_ratio(ratio,C_start,E_start,A_start):
 
-	print(yellow('solstice -D%s,%s -v -n %s -R %s/demo-rcv.yaml -fo %s/simul %s/demo.yaml'%(
-		azimuth,
-		elevation,
-		int(num_rays),
-		yaml_folder,
-		simul_folder,
-		yaml_folder
-		))
-		)
-	os.system('solstice -D%s,%s -v -n %s -R %s/demo-rcv.yaml -fo %s/simul %s/demo.yaml'%(
-		azimuth,
-		elevation,
-		int(num_rays),
-		yaml_folder,
-		simul_folder,
-		yaml_folder
-		)
-		)
-
-if __name__=='__main__':
 	# define a unique case folder for the user
-	snum = 0
-	suffix = ""
-	while 1:
-		dt = datetime.datetime.now()
-		ds = dt.strftime("%a-%H-%M")
-		basefolder = os.path.join(currentdir,'case-%s%s'%(ds,suffix))
-		if os.path.exists(basefolder):
-			snum+=1
-			suffix = "-%d"%(snum,)
-			if snum > 200:
-				raise RuntimeError("Some problem with creating basefolder")
-		else:
-			# good, we have a new case dir
-			break
+	basefolder = os.path.join(currentdir,'case-test-N08811')
 
 	if not os.path.exists(basefolder):
 		os.makedirs(basefolder)
 
 	folder=basefolder
-	os.system("cp pos_and_aiming.csv %s"%(basefolder))
 	source_path=parentdir
 
-	# Inputs
-	num_bundle=16         # Number of panels
-	r_height=24.0         # Receiver height [m]
-	r_diameter=16.0       # Receiver diameter [m]
+	# Inputs (Gemasolar)
+	num_bundle=18         # Number of panels
+	r_height=10.5         # Receiver height [m]
+	r_diameter=8.5        # Receiver diameter [m]
 	bins=50               # Vertical bins
-	tower_h=175.0         # Tower height [m]
+	tower_h=114.75        # Tower height [m] (Floor to receiver bottom)
 	azimuth=0.0           # Solar azimuth angle [degrees]
 	elevation=55.15       # Solar elevation angle [degrees]
-	DNI=980.0             # Beam irradiance [W/m2]
-	num_fp=8              # Two panels per flow path (num_bundle/2)
-	D0=60.33              # Panel tube OD [mm]
+	DNI=930.0             # Beam irradiance [W/m2]
+	num_fp=2              # Number of flow path
+	D0=45.00              # Panel tube OD [mm]
 	num_rays=int(5e6)     # Number of rays
 
 	# Creating receiver model
@@ -105,42 +63,16 @@ if __name__=='__main__':
 		elevation,
 		DNI,
 		D0)
-	Model.New_search_algorithm()
+	Model.sweeping_algorithm(C_start,E_start,A_start)
 
-	azimuth=270.0 - Model.phi
-	if (azimuth>=360.0 or azimuth<0.0):
-		azimuth = (azimuth+360.0)%(360.0)
+if __name__=='__main__':
+	parser = argparse.ArgumentParser(description='Run representative sun positions of annual simulation for a specific DNI ratio')
+	parser.add_argument('--ratio', type=int, default=1, help='DNI ratio to be simulated. Default=1')
+	parser.add_argument('--fpath', type=int, default=1, help='Flowpath data to be compiled. Default=1')
+	parser.add_argument('--C_start', type=float, default=0.5, help='The starting value of the aiming extent')
+	parser.add_argument('--E_start', type=float, default=2.0, help='The starting value of the aiming exponent')
+	parser.add_argument('--A_start', type=float, default=0.5, help='The starting value of the aiming asymetry factor')
+	args = parser.parse_args()
 
-	# creating a case folder for each new simul file
-	designfolder = '%s/vtk'%basefolder
-	casefolder = '%s/pos'%basefolder
-	if not os.path.exists(casefolder):
-		os.makedirs(casefolder)
-
-	runSOLSTICE(
-		azimuth,
-		Model.elevation,
-		designfolder,
-		casefolder,
-		num_rays
-		)
-
-	# Optical postprocessing
-	eta,q_results,eta_exc_intec=proces_raw_results(
-			'%s/simul'%casefolder,
-			casefolder)
-	eff_interception=eta/eta_exc_intec
-	print 'Optical efficiency: %s'%(eta)
-
-	# Read flux map
-	read_data(
-			casefolder,
-			Model.r_height,
-			Model.r_diameter,
-			Model.num_bundle,
-			Model.bins,
-			flux_file=True
-			)
-
-	Model.simple_HT_model(20.0,0.0,casefolder)
+	simulate_dni_ratio(args.ratio, args.C_start, args.E_start, args.A_start)
 

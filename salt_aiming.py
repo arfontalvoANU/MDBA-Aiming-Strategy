@@ -167,7 +167,7 @@ class one_key_start:
 			aiming_results:       
 			Strt:                 
 		"""
-		flux_folder = '201015_N06230_thermoElasticPeakFlux_velocity_salt'
+		flux_folder = '201015_N08811_thermoElasticPeakFlux_velocity_salt'
 		rec = Cyl_receiver(
 				radius=0.5*self.r_diameter, 
 				height=self.r_height,
@@ -192,7 +192,7 @@ class one_key_start:
 				filesave=self.folder+'/flux-table',
 				air_velocity=V_wind)
 		flux_limits_file = \
-				'%s/%s/N06230_OD%s_WT1.20_peakFlux.csv'%(
+				'%s/%s/N08811_OD%s_WT1.50_peakFlux.csv'%(
 				self.source,
 				flux_folder,
 				round(self.D0,2))
