@@ -19,6 +19,18 @@ from cal_sun import *
 from scipy import interpolate
 from run_solstice import *
 
+import colorama
+colorama.init()
+
+def yellow(text):
+	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def green(text):
+	return colorama.Fore.GREEN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def magenta(text):
+	return colorama.Fore.MAGENTA + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
 class one_key_start:
 	def __init__(self, folder, source, num_bundle, num_fp, r_height,
 			r_diameter, bins, tower_h, phi, elevation, DNI, D0,
@@ -174,7 +186,7 @@ class one_key_start:
 				n_banks=self.num_bundle,
 				n_elems=self.bins,
 				D_tubes_o=self.D0/1000.,
-				D_tubes_i=self.D0/1000.-2.*1.2e-3, 
+				D_tubes_i=self.D0/1000.-2.*1.5e-3, 
 				abs_t=self.abs_t, 
 				ems_t=self.ems_t, 
 				k_coating=1.2, 
@@ -184,7 +196,7 @@ class one_key_start:
 				fluxmap_file=self.folder+'/flux-table.csv')
 		rec.balance(
 				HC=Solar_salt(),
-				material=Haynes230(),
+				material=Inconel800H(),
 				T_in=290+273.15,
 				T_out=565+273.15,
 				T_amb=T_amb+273.15,
@@ -216,9 +228,9 @@ class one_key_start:
 
 		# The input for optical modelling
 		self.C_aiming=C_aiming
-		print C_aiming
-		print Exp
-		print A_f
+		print yellow('          Aiming extent:     ') + ' '.join(str(x) for x in C_aiming)
+		print yellow('          Shape exponent:    ') + ' '.join(str(x) for x in Exp)
+		print yellow('          Asymmetry factor:  ') + ' '.join(str(x) for x in A_f)
 		att_factor=self.attenuation(self.csv_trimmed)
 
 		# Change of aiming points 
@@ -247,7 +259,7 @@ class one_key_start:
 				'%s/vtk/simul'% self.folder,
 				'%s/vtk'% self.folder)
 		eff_interception=eta/eta_exc_intec
-		print 'Interception efficiency: ' + str(eff_interception)
+		print(magenta('          Interception efficiency: ') + str(eff_interception))
 
 		# Read flux map
 		read_data(
@@ -260,7 +272,7 @@ class one_key_start:
 				flux_map=True)
 
 		# Thermal simulation
-		results,aiming_results,Strt=self.HT_model(20.,0.)
+		results,aiming_results,Strt=self.HT_model(35.,0.)
 
 		# Print aiming_results
 		print aiming_results[1]

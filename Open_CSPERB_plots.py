@@ -505,15 +505,19 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		#plt.close(fig)
 		'''
 		bot=0.08
-		top=0.93
+		top=0.87
 		if n_banks/len(fp)==2:
 			fig = plt.figure(figsize=(4*2,(2.+(len(fp)-1)*1.1)/1.7), dpi=1000)
-		else: 
+		elif n_banks/len(fp)==1: 
 			fig = plt.figure(figsize=(8*2,(2.+(len(fp)-1)*1.1)/1.7), dpi=1000)
+		elif n_banks/len(fp)==3:
+			fig = plt.figure(figsize=(4*2,(2.+(len(fp)-1)*1.1)/1.7*1.8), dpi=1000)
+		else:
+			fig = plt.figure(figsize=(6,4), dpi=1000)
 		plt.subplots_adjust(left=0.15, bottom=bot, right=0.95, top = top)
 		Success=[]
 		Positive=[]
-		safety_factor=0.9
+		safety_factor=1.0
 		A_over=N.array([])
 		C_safe=N.array([])
 		C_net=N.array([])
@@ -521,23 +525,29 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		for f in xrange(len(fp)):
 			bank_lengths = pipe_lengths[f]
 			bank_lengths_2 = (bank_lengths[1:]+bank_lengths[:-1])/2.
-			if n_banks/len(fp)==2:
+			if n_banks/len(fp)==1:
+				ax=plt.subplot(int(len(fp)/4),4,f+1)
+				size=18
+				plt.text(x=bank_lengths[30], y=1300, s='T%s'%Strt[f], ha='right',fontsize=size)
+			elif n_banks/len(fp)==2:
 				ax=plt.subplot(int(len(fp)/2),2,f+1)
 				size=12
 				plt.text(x=bank_lengths[30], y=1300, s='T%s'%(Strt[2*f]+1), ha='right',fontsize=size)
 				plt.text(x=bank_lengths[80], y=1000, s='T%s'%(Strt[2*f+1]+1), ha='right',fontsize=size)
 			elif len(fp)==2:
-				ax=plt.subplot(1, 2, f+1)
+				ax=plt.subplot(2, 1, f+1)
 				size=12
-				plt.text(x=bank_lengths[30], y=1300, s='f%s'%(f), ha='right',fontsize=size)
 			else:
 				ax=plt.subplot(int(len(fp)/4),4,f+1)
 				size=18
 				plt.text(x=bank_lengths[30], y=1300, s='T%s'%Strt[f], ha='right',fontsize=size)
-				
+
 			if len(fp)>1:
-				plt.text(x=bank_lengths[n_elems], y=1100, s='Fp %s'%str(f+1), ha='right',fontsize=size)
-			
+				if n_banks/len(fp)==3:
+					plt.text(x=bank_lengths[120], y=1300, s='Fp %s'%str(f+1), ha='right',fontsize=size)
+				elif n_banks/len(fp)==2:
+					plt.text(x=bank_lengths[n_elems], y=1500, s='Fp %s'%str(f+1), ha='right',fontsize=size)
+
 			plt.plot(bank_lengths_2, q_net[fp[f]]/areas[fp[f]]/1e3, label=r'${\dot{q}^{\prime \prime}_\mathrm{abs}}$', color='0.6')
 			flux_lims = flux_limits_V(V[f], T_HC[f], flux_limits_file)/1e3
 			safe_flux_lims = safety_factor*flux_lims

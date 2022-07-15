@@ -195,6 +195,31 @@ class Inconel740H(Pipe_material):
 	def alpha(self, T):
 		return 1.194e-14*T**3-2.359E-11*T**2 + 1.888E-8*T + 8.603E-06
 
+class Inconel800H(Pipe_material):
+	'''
+	Inconel 800H properties from "Boiler Pressure Vessel Code Section II Part D: Materials Properties." American Society of Mechanical Engineers (2010).
+	'''
+	def __init__(self, Tmin=273., Tmax=1023.15):
+		Pipe_material.__init__(self, Tmin, Tmax)
+
+	@check_valid
+	def k(self, T):
+		return 4.503E+00+2.887E-02*T-2.020E-05*T**2+1.018E-08*T**3
+
+	def rho(self):
+		return 8.03e3
+
+	@check_valid
+	def E(self, T):
+		return 2.147E+02-7.454E-02*T+4.993E-05*T**2-3.615E-08*T**3
+
+	@check_valid  
+	def nu(self, T):
+		return N.ones(len(T))*0.31
+
+	@check_valid
+	def alpha(self, T):
+		return (-1.939E+01+2.583E-01*T-7.484E-04*T**2+1.090E-06*T**3-7.844E-10*T**4+2.244E-13*T**5)/1e6
 
 if __name__ == '__main__':
 	import sys
