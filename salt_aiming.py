@@ -104,7 +104,7 @@ class one_key_start:
 		phi=270.0-phi
 		if (phi>=360.0 or phi<0.0):
 			phi = (phi+360.0)%(360.0)
-		print('azi: %s [deg]\tele: %s [deg]\tdni: %s [W/m2]'%(phi, elevation, dni))
+		print(yellow('          Sun position:      ') + '(%.2f, %.2f), DNI %.1f'%(phi, elevation, dni))
 
 		# Defining folder to save yaml and simul files
 		if ufolder:
@@ -228,9 +228,9 @@ class one_key_start:
 
 		# The input for optical modelling
 		self.C_aiming=C_aiming
-		print yellow('          Aiming extent:     ') + ' '.join(str(x) for x in C_aiming)
-		print yellow('          Shape exponent:    ') + ' '.join(str(x) for x in Exp)
-		print yellow('          Asymmetry factor:  ') + ' '.join(str(x) for x in A_f)
+		print(yellow('          Aiming extent:     ') + ' '.join('%.2f'%x for x in C_aiming))
+		print(yellow('          Shape exponent:    ') + ' '.join('%.2f'%x for x in Exp))
+		print(yellow('          Asymmetry factor:  ') + ' '.join('%.2f'%x for x in A_f))
 		att_factor=self.attenuation(self.csv_trimmed)
 
 		# Change of aiming points 
@@ -275,7 +275,7 @@ class one_key_start:
 		results,aiming_results,Strt=self.HT_model(35.,0.)
 
 		# Print aiming_results
-		print aiming_results[1]
+		print(yellow('          Aiming result:     ') + ' '.join('%s'%x for x in aiming_results[1]))
 		return aiming_results,eff_interception,Strt
 
 	def get_I_Meinel(self,elevation):
@@ -368,7 +368,6 @@ class one_key_start:
 			try:
 				aiming_results,eff_interception,Strt=self.aiming_loop(C_aiming,Exp,A_f)
 				isuccessful = True
-				print('Initialization successful')
 			except ValueError:
 				C_aiming[:] += 0.05
 		gap=0.05
