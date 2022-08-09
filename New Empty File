@@ -1,5 +1,0 @@
-source ~/Solstice-0.8.1-GNU-Linux64/etc/solstice.profile
-cd /home/admin-shuang/OneDrive/Sodium_project/Aiming/New/Git/git-aiming
-python2 onekey_aiming.py
-
-find . -name "*.pyc" -exec rm -f {} \

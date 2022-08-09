@@ -1,0 +1,4 @@
+- {name: cylinder, side: FRONT, per_primitive: ABSORBED}
+- name: virtual_target_e 
+  side: BACK 
+  per_primitive: INCOMING 
