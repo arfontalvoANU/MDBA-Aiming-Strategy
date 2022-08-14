@@ -95,7 +95,7 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 	theta = np.linspace(-np.pi, np.pi, num_bundle+1)
 	h = np.linspace(r_height, 0, bins)
 	theta, h = np.meshgrid(theta, h)
-	Flux=Flux[7:,1:].astype(np.float)
+	Flux=Flux[7:,1:].astype(float)
 	norm2 = colors.Normalize(vmin=np.amin(Flux), vmax=np.amax(Flux))
 	if flux_map==True:
 		fig = plt.figure()
