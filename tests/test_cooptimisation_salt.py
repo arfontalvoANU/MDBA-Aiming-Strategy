@@ -5,6 +5,8 @@ import unittest
 
 import os
 import numpy as np
+import pickle
+from scipy.interpolate import interp2d
 
 
 class TestCooptimisationSalt(unittest.TestCase):
@@ -61,7 +63,7 @@ class TestCooptimisationSalt(unittest.TestCase):
 		C_aiming=np.zeros(Model.num_bundle)
 		C_aiming[:]=0.4
 		material_name='N08811'
-		flux_limits_file='%s/%s_OD%.2f_WT1.50_peakFlux.csv'%(Model.fluxlimitpath,material_name, Model.D0)
+		flux_limits_file='%s/%s_OD%.2f_WT1.20_peakFlux.csv'%(Model.fluxlimitpath,material_name, Model.D0)
 		results,aiming_results,vel_max=tower_receiver_plots(
 			files=Model.casedir+'/flux-table', 
 			efficiency=False, 
@@ -73,8 +75,6 @@ class TestCooptimisationSalt(unittest.TestCase):
 			flux_limits_file=flux_limits_file,
 			C_aiming=C_aiming,overflux=False)
 
-		import pickle
-		from scipy.interpolate import interp2d
 		fileo = open('%s/flux-table'%(casedir),'rb')
 		data = pickle.load(fileo)
 		fileo.close()
@@ -87,6 +87,8 @@ class TestCooptimisationSalt(unittest.TestCase):
 			np.savetxt('%s/flux_lim_%s.csv'%(casedir,j), flux_lim[:,0]/1e3, delimiter=',')
 			table=data['q_net'][fp]/data['areas'][fp]*1e-6
 			np.savetxt('%s/flux_mdba_%s.csv'%(casedir,j),table,delimiter=',')
+		data['CG'] = data['q_net'][fp]/data['areas'][fp]*1e-6
+		data['flux_lim'] = flux_lim[:,0]*1e-6
 
 		print('	n_tubes:     %d  '%(data['n_tubes'][0]))
 		print('	m_flow fp 1: %.2f'%(data['m'][0]/data['n_tubes'][0]))
@@ -96,6 +98,10 @@ class TestCooptimisationSalt(unittest.TestCase):
 		print('	T_out  fp 2: %.2f'%(data['T_HC'][1][-1]-273.15))
 		print('	h_conv_ext:  %s  '%data['h_conv_ext'])
 		print('	T_ext_ave:   %.2f'%(np.average(data['T_ext'])))
+
+		file_o = open('%s/flux-table'%(casedir), 'wb')
+		pickle.dump(data, file_o)
+		file_o.close()
 
 	def test_touching(self):
 		if os.path.exists(self.tablefile):
