@@ -424,7 +424,7 @@ class one_key_start:
 		print('	Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool))) # for each flow path
 		print('	vel_max:', np.max(vel_max))
 
-		gap=0.01
+		gap=0.1
 		Defocus=np.all(aiming_results[1])==False
 		title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 
@@ -463,7 +463,7 @@ class one_key_start:
 				for i in range(self.num_bundle):
 					if aiming_results[1][i]==False or Vel_bool[i]==False:
 						if C_aiming[int(Strt[i])]>0.8:
-							gap=0.01
+							gap=0.05
 						C_aiming[int(Strt[i])]+=gap
 						if np.all(C_aiming<1.0):
 							if Strt[i]==self.num_bundle-1:
@@ -478,19 +478,19 @@ class one_key_start:
 						# for A
 						if A_f[int(Strt[i])]>0.5:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]+=0.01
+								A_f[int(Strt[i])]+=0.02
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]-=0.01
+								A_f[int(Strt[i])]-=0.02
 						else:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]-=0.01
+								A_f[int(Strt[i])]-=0.02
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]+=0.01
+								A_f[int(Strt[i])]+=0.02
 						# for S
 						if aiming_results[5][i]>0.55:
-							Exp[int(Strt[i])]-=0.05
+							Exp[int(Strt[i])]-=0.2
 						elif aiming_results[5][i]<0.45:
-							Exp[int(Strt[i])]+=0.05
+							Exp[int(Strt[i])]+=0.2
 			C_aiming[C_aiming>1.]=1.0
 			if self.pattern=='NES-NWS':
 				A_f[2:self.num_bundle-2]=0.5 # no tilted aiming
