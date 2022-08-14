@@ -118,7 +118,6 @@ class one_key_start:
 		else:
 			print('ERROR: receiver material not found')
 
-
 		self.sunshape=sunshape
 		self.sunshape_param=sunshape_param
 		
@@ -418,7 +417,9 @@ class one_key_start:
 		results,aiming_results,vel_max,Strt=self.HT_model(35.,0.)
 		Vel_bool=vel_max<2.44
 		print('	Q_abs', q_results[-1])
-		print('	C_aiming', C_aiming)
+		print('	Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
+		print('	Shape exponent:    [' + ','.join('%.2f'%x for x in Exp) + ']')
+		print('	Asymmetry factor:  [' + ','.join('%.2f'%x for x in A_f) + ']')
 		print('	aiming_results[1]: %s/%s'%(np.sum(aiming_results[1]), len(aiming_results[1])))  # for each tube bank
 		print('	Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool))) # for each flow path
 		print('	vel_max:', np.max(vel_max))
@@ -517,9 +518,9 @@ class one_key_start:
 			read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True,flux_map=False)
 			results,aiming_results,vel_max,Strt=self.HT_model(35.,0.,overflux=not np.all(aiming_results[1]))
 			Vel_bool=vel_max<2.44
-			print('		C_aiming', C_aiming)
-			print('		Exp', Exp)
-			print('		A_f', A_f)
+			print('		Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
+			print('		Shape exponent:    [' + ','.join('%.2f'%x for x in Exp) + ']')
+			print('		Asymmetry factor:  [' + ','.join('%.2f'%x for x in A_f) + ']')
 			print('		aiming_results[1]: %s/%s'%(np.sum(aiming_results[1]), len(aiming_results[1])))
 			print('		Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool)))
 			print('		vel_max:', np.max(vel_max))
