@@ -59,49 +59,7 @@ class TestCooptimisationSalt(unittest.TestCase):
 		print('	Equivalent slope error: %.2f [mrad]'%(0.5*1e3*np.sqrt(4*pow(2.6e-3,2)+pow(2.1e-3,2))))
 		# input the number of tube bundles, number of flowpaths, pipe outer diameter and flow path pattern
 		Model.flow_path_salt(num_bundle=18,num_fp=2,D0=45.,pattern='NES-NWS') 
-		Model.MDBA_aiming_new(dni=930.,phi=0.,elevation=75.89)
-		C_aiming=np.zeros(Model.num_bundle)
-		C_aiming[:]=0.4
-		material_name='N08811'
-		flux_limits_file='%s/%s_OD%.2f_WT1.20_peakFlux.csv'%(Model.fluxlimitpath,material_name, Model.D0)
-		results,aiming_results,vel_max=tower_receiver_plots(
-			files=Model.casedir+'/flux-table', 
-			efficiency=False, 
-			maps_3D=False, 
-			flux_map=False, 
-			flow_paths=True,
-			saveloc=None, 
-			billboard=False, 
-			flux_limits_file=flux_limits_file,
-			C_aiming=C_aiming,overflux=False)
-
-		fileo = open('%s/flux-table'%(casedir),'rb')
-		data = pickle.load(fileo)
-		fileo.close()
-
-		fdata = np.loadtxt(flux_limits_file, delimiter=',')
-		fit = interp2d(fdata[0,1:], fdata[1:,0], fdata[1:,1:])
-		for j in range(2):
-			fp = data['fp'][j]
-			flux_lim = fit(data['V'][j], data['T_HC'][j])
-			np.savetxt('%s/flux_lim_%s.csv'%(casedir,j), flux_lim[:,0]/1e3, delimiter=',')
-			table=data['q_net'][fp]/data['areas'][fp]*1e-6
-			np.savetxt('%s/flux_mdba_%s.csv'%(casedir,j),table,delimiter=',')
-		data['CG'] = data['q_net'][fp]/data['areas'][fp]*1e-6
-		data['flux_lim'] = flux_lim[:,0]*1e-6
-
-		print('	n_tubes:     %d  '%(data['n_tubes'][0]))
-		print('	m_flow fp 1: %.2f'%(data['m'][0]/data['n_tubes'][0]))
-		print('	m_flow fp 2: %.2f'%(data['m'][1]/data['n_tubes'][0]))
-		print(' ')
-		print('	T_out  fp 1: %.2f'%(data['T_HC'][0][-1]-273.15))
-		print('	T_out  fp 2: %.2f'%(data['T_HC'][1][-1]-273.15))
-		print('	h_conv_ext:  %s  '%data['h_conv_ext'])
-		print('	T_ext_ave:   %.2f'%(np.average(data['T_ext'])))
-
-		file_o = open('%s/flux-table'%(casedir), 'wb')
-		pickle.dump(data, file_o)
-		file_o.close()
+		Model.annual_trimmed_field()
 
 	def test_touching(self):
 		if os.path.exists(self.tablefile):

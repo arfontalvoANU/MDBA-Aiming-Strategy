@@ -25,7 +25,7 @@ from .Loss_analysis import receiver_correlation
 from .output_motab import output_motab, output_matadata_motab
 from .python_postprocessing import proces_raw_results, get_heliostat_to_receiver_data
 from .SOLSTICE import SolsticeScene
-
+import pickle
 
 class one_key_start:
 	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85):
@@ -560,8 +560,8 @@ class one_key_start:
 		T_amb_g=np.linspace(-5.6,45,5)
 		V_wind_g=np.linspace(0.,18.,5)
 		results_table=np.array([]) # RELT
-		#DNI_ratio=[1.24,1.00,0.76,0.52]
-		DNI_ratio=[1.00]
+		DNI_ratio=[1.39,1.00,0.87,0.56]
+		#DNI_ratio=[1.00]
 		sun=SunPosition()
 		F[:,:,:]=0.
 		Defocus=F[:,:,0]==0
@@ -581,8 +581,17 @@ class one_key_start:
 						continue
 					dni=self.get_I(elevation)
 					Defocus[n,m],F[n,m,:]=self.MDBA_aiming_new(dni=dni*DNI_ratio[d],phi=phi,elevation=elevation)
-					#print('	OPTICAL EFFICIENCY',F[n,m,:])
+					print('	OPTICAL EFFICIENCY',F[n,m,:])
 
+					fileo = open('%s/flux-table'%(self.casedir),'rb')
+					data = pickle.load(fileo)
+					fileo.close()
+					CG = np.zeros((2,450))
+					for j in range(2):
+						fp = data['fp'][j]
+						CG[j,:] = data['q_net'][fp]/data['areas'][fp]*1e-3
+					np.savetxt('%s/CG_n%s_m%s_d%s.csv'%(self.casedir,n,m,DNI_ratio[d]), CG, fmt='%s', delimiter=',')
+					print('	CG table saved')
 
 					# generate the RELT
 					if d==0:
