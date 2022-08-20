@@ -370,7 +370,7 @@ class one_key_start:
 
 		# initialization for aiming
 		C_aiming=np.zeros(self.num_bundle)
-		C_aiming[:]=0.4
+		C_aiming[:]=0.5
 		Exp=np.zeros(self.num_bundle)
 		Exp[:]=3.0
 		A_f=np.zeros(self.num_bundle)
