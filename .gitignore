@@ -4,3 +4,12 @@ flux-table*
 pos_and_aiming_new*
 build
 mdbapy.egg-info
+Defocus_*
+Equinox.csv
+F_optic_*
+F_unavail_*
+OELT_Solstice.motab
+RELT.csv
+*.yaml
+pos_and_aiming_stand_by.csv
+simul
