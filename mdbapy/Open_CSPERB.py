@@ -920,10 +920,42 @@ class Cyl_receiver():
 		self.Strt=Strt
 		return Strt
 
+	def secant(self, fun,x0,tol=1e-2, maxiter=100):
+		x1 = (1.-1e-5)*x0
+		f0 = fun(x0)
+		f1 = fun(x1)
+		i = 0
+		xs = [x0,x1]
+		fs = [f0,f1]
+		alpha = 1
+		while abs(f1) > tol and i < maxiter:
+			x2 = float(f1 - f0)/(x1 - x0)
+			x = x1 - alpha*float(f1)/x2
+
+			if x<0:
+				alpha=alpha/2.
+			elif N.isnan(fun(x)):
+				alpha=alpha/2.
+			else:
+				x0 = x1
+				x1 = x
+				f0 = f1
+				f1 = fun(x1)
+				alpha = 1
+
+			xs.append(x1)
+			fs.append(f1)
+			i += 1
+
+		fmin = min(fs)
+		imin = fs.index(fmin)
+		xmin = xs[imin]
+		return xmin
+
 	def fun(self, m_flow):
 
 		T_temp = self.T_in*N.ones(self.nz+1)
-
+		To_temp = self.T_in*N.ones(self.nz)
 		for i in range(self.nz):
 			# Temperature
 			Tf = T_temp[i]
@@ -937,11 +969,11 @@ class Cyl_receiver():
 			Re = m_flow * self.d / (self.area * mu)    # HTF Reynolds number
 			Pr = mu * C / kf                           # HTF Prandtl number
 			f = pow(1.82*N.log10(Re) - 1.64, -2.)
-			if N.isnan(f):
-				break
 			Nu = (f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.))
+			Nu = max(Nu,4.36)
+			hf = Nu*kf/self.d
 			# Convective heat transfer
-			hf = Nu * kf / self.d / (1. + Nu * kf / self.d * self.R_fouling)
+			hf = 1./(1./hf + self.R_fouling)
 			# 2D fun
 			cosinesm,fluxes = N.meshgrid(self.cosines,self.CG[i])
 			qabs = fluxes*cosinesm
@@ -954,9 +986,15 @@ class Cyl_receiver():
 			qnet = hf*(Ti - Tf)
 			qnet = N.concatenate((N.flip(qnet[:,1:-1],axis=1),qnet),axis=1)
 			Qnet = qnet.sum(axis=1)*self.Ri*self.dt*self.dz
-			T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
+			if Re<1e-3:
+				T_temp[i+1] = T_temp[i]
+				To_temp[i] = T_temp[i]
+			else:
+				T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
+				To_temp[i] = N.amax(To)
 		self.T_f = T_temp
-		return abs(self.T_out-T_temp[-1])
+		self.Text= To_temp
+		return abs(self.T_out-T_temp[self.nz])
 
 	def balance(self, HC, material, T_in, T_out, T_amb, h_conv_ext, filesave='/home/charles/Documents/Boulot/ASTRI/Sodium receiver_CMI/ref_case_result', load=1., air_velocity=5.):
 
@@ -1135,19 +1173,20 @@ class Cyl_receiver():
 			self.nz = len(fp)
 			self.CG = self.flux_fp[f]
 			m_flow = self.m[f]/self.n_tubes[f]
-			cons = []
-			l = {'type': 'ineq', 'fun': lambda x, lb=0.0000: x - lb}
-			u = {'type': 'ineq', 'fun': lambda x, ub=m_flow: ub - x}
-			cons.append(l)
-			cons.append(u)
-
-			res=optimize.minimize(self.fun, 0.5*m_flow, constraints=cons, method='COBYLA', options={'disp':False})
-			rss=self.fun(res.x[0])
-			V = HC.V_tube(res.x[0], 0.5*(self.T_f[:-1]+self.T_f[1:]), self.D_tubes_i)
-			print(yellow('	m_flow: %.2f	V_min: %.2f	V_max: %.2f	T_min: %.2f	T_max: %.2f'%(res.x[0],N.amin(V),N.amax(V),N.amin(self.T_f),N.amax(self.T_f))))
+			if N.isnan(m_flow):
+				m_flow = self.m[f-1]/self.n_tubes[f-1]
+			res=self.secant(self.fun, m_flow)
+			rss=self.fun(res)
+			V = HC.V_tube(res, 0.5*(self.T_f[:-1]+self.T_f[1:]), self.D_tubes_i)
+			if N.isnan(self.m[f]):
+				q_rad = self.eff_ems*self.areas_fp[f]*5.67e-8*(self.Text**4.-T_amb**4.)
+				q_conv = self.areas_fp[f]*self.h_conv_ext*(self.Text-T_amb)
+				q_net = (self.eff_abs*self.flux_fp[f]*self.areas_fp[f]-q_rad-q_conv)
+				self.q_net[fp] = q_net
+			print(yellow('	m_flow [kg/s]: %.6f	V_min [m/s]: %.6f	V_max [m/s]: %.6f	T_min [K]: %.6f	T_max [K]: %.6f	T_out [C]: %.2f'%(res,N.amin(V),N.amax(V),N.amin(self.T_f),N.amax(self.T_f),self.T_f[self.nz]-273.15)))
 			self.T_HC[f] = self.T_f
 			self.V[fp] = V
-			self.m[f] = res.x[0]*self.n_tubes[f]
+			self.m[f] = res*self.n_tubes[f]
 
 		if N.isnan(N.hstack(self.V).any()):
 			print('	Energy balance error')
