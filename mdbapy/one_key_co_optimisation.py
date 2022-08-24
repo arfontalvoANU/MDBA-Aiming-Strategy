@@ -414,7 +414,7 @@ class one_key_start:
 		spi_loss=q_results[6]/q_results[0]*usage
 		print('	Interception efficiency: ' + str(eta/eta_exc_intec))
 		read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True,flux_map=False)
-		results,aiming_results,vel_max,Strt=self.HT_model(35.,0.)
+		results,aiming_results,vel_max,Strt=self.HT_model(25.,5.)
 		Vel_bool=vel_max<2.44
 		print('	Q_abs', q_results[-1])
 		print('	Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
@@ -492,6 +492,10 @@ class one_key_start:
 						elif aiming_results[5][i]<0.45:
 							Exp[int(Strt[i])]+=0.2
 			C_aiming[C_aiming>1.]=1.0
+			Exp[Exp<0.2] = 0.2
+			Exp[Exp>3.4] = 3.4
+			A_f[A_f<0.02]= 0.02
+			A_f[A_f>1.]  = 1.0
 			if self.pattern=='NES-NWS':
 				A_f[2:self.num_bundle-2]=0.5 # no tilted aiming
 			Hst_info,Hst_stand=aiming(
@@ -516,7 +520,7 @@ class one_key_start:
 			att_loss=q_results[5]/q_results[0]*usage
 			spi_loss=q_results[6]/q_results[0]*usage
 			read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True,flux_map=False)
-			results,aiming_results,vel_max,Strt=self.HT_model(35.,0.,overflux=not np.all(aiming_results[1]))
+			results,aiming_results,vel_max,Strt=self.HT_model(25.,5.,overflux=not np.all(aiming_results[1]))
 			Vel_bool=vel_max<2.44
 			print('		Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
 			print('		Shape exponent:    [' + ','.join('%.2f'%x for x in Exp) + ']')
