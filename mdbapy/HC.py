@@ -166,7 +166,7 @@ class Solar_salt():
 	def __init__(self):
 		print('Solar salt HC')
 		self.Tmin = 533.
-		self.Tmax = 873.
+		self.Tmax = 873.+50.
 
 	def check_valid(self, T):
 		if hasattr(T,'__len__'):
