@@ -564,11 +564,12 @@ class one_key_start:
 		T_amb_g=np.linspace(-5.6,45,5)
 		V_wind_g=np.linspace(0.,18.,5)
 		results_table=np.array([]) # RELT
-		DNI_ratio=[1.39,1.00,0.87,0.56]
+		DNI_ratio=[1.00,1.39,0.87,0.56]
 		#DNI_ratio=[1.00]
 		sun=SunPosition()
 		F[:,:,:]=0.
 		Defocus=F[:,:,0]==0
+		Tbool=F[:,:,0]==0
 		d=0
 		for d in range(int(len(DNI_ratio))):
 			for n in range(3,8):
@@ -585,6 +586,14 @@ class one_key_start:
 						continue
 					dni=self.get_I(elevation)
 					Defocus[n,m],F[n,m,:]=self.MDBA_aiming_new(dni=dni*DNI_ratio[d],phi=phi,elevation=elevation)
+
+					shutil.copy('%s/flux-table'%self.casedir,'%s/flux_table_n%s_m%s_d%s'%(self.casedir,n,m,DNI_ratio[d]))
+					fileo = open(self.casedir+'/flux-table','rb')
+					data = pickle.load(fileo)
+					fileo.close()
+					Tbool[n,m] = (abs(data['T_HC'][0][450] - self.T_out) < 0.1) and (abs(data['T_HC'][1][450] - self.T_out) < 0.1)
+					print(Tbool[n,m])
+
 					print('	OPTICAL EFFICIENCY',F[n,m,:])
 
 					fileo = open('%s/flux-table'%(self.casedir),'rb')
@@ -625,21 +634,26 @@ class one_key_start:
 				for m in range(int(0.5*M)+1,M+1):
 					F[n,m,:]=F[n,M-m,:]
 					Defocus[n,m]=Defocus[n,M-m]
+					Tbool[n,m]=Tbool[n,M-m]
 			
 			# symmetric due to season		
 			for n in range(3):
 				F[n,:,:]=F[5-n,:,:]
 				Defocus[n,:]=Defocus[5-n,:]
+				Tbool[n,:]=Tbool[5-n,:]
 			
 			for n in range(8,11):
 				F[n,:,:]=F[15-n,:,:]
 				Defocus[n,:]=Defocus[15-n,:]
+				Tbool[n,:]=Tbool[15-n,:]
 			
 			for n in range(N+1):
 				for m in range(M+1):
 					if F[n,m,0]==0:
 						Defocus[n,m]=False
+						Tbool[n,m]=False
 			np.savetxt('%s/Defocus_%s.csv'%(self.casedir,DNI_ratio[d]), Defocus, fmt='%s', delimiter=',')
+			np.savetxt('%s/Tbool_%s.csv'%(self.casedir,DNI_ratio[d]), Tbool, fmt='%s', delimiter=',')
 			# to output F
 			F_output=np.arange((N+2)*(M+2),dtype=float).reshape(N+2,M+2)
 			F_output[0,1:]=Omega/np.pi*180.
