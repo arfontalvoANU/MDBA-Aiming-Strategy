@@ -352,11 +352,12 @@ class one_key_start:
 		self.pattern=Candidate[idx,3]
 		np.savetxt('%s/flowpath.csv'%(self.casedir), np.array([self.num_bundle,self.num_fp,self.D0,self.pattern]), fmt='%s', delimiter=',')
 	
-	def flow_path_salt(self,num_bundle,num_fp,D0,pattern): 
+	def flow_path_salt(self,num_bundle,num_fp,D0,WT,pattern): 
 		np.savetxt('%s/flowpath.csv'%(self.casedir), np.array([num_bundle,num_fp,D0,pattern]), fmt='%s', delimiter=',')
 		self.num_bundle=num_bundle
 		self.num_fp=num_fp
 		self.D0=D0
+		self.WT=WT
 		self.pattern=pattern
 		self.num_pass=num_bundle/2
 		
@@ -596,16 +597,6 @@ class one_key_start:
 
 					print('	OPTICAL EFFICIENCY',F[n,m,:])
 
-					fileo = open('%s/flux-table'%(self.casedir),'rb')
-					data = pickle.load(fileo)
-					fileo.close()
-					CG = np.zeros((2,450))
-					for j in range(2):
-						fp = data['fp'][j]
-						CG[j,:] = data['q_net'][fp]/data['areas'][fp]*1e-3
-					np.savetxt('%s/CG_n%s_m%s_d%s.csv'%(self.casedir,n,m,DNI_ratio[d]), CG, fmt='%s', delimiter=',')
-					print('	CG table saved')
-
 					# generate the RELT
 					if d==0:
 						if n==3 or n==5 or n==7:
@@ -730,7 +721,7 @@ class one_key_start:
 		elif self.rec_material=='Incoloy800H':
 			material_name='N08811'
 	
-		flux_limits_file='%s/%s_OD%.2f_WT1.20_peakFlux.csv'%(self.fluxlimitpath,material_name, self.D0)
+		flux_limits_file='%s/%s_OD%.2f_WT%.2f_peakFlux.csv'%(self.fluxlimitpath,material_name, self.D0,self.WT)
 	
 		results,aiming_results,vel_max=tower_receiver_plots(
 			files=self.casedir+'/flux-table', 
