@@ -53,12 +53,12 @@ class TestCooptimisationSalt(unittest.TestCase):
 			slope_error=0.5*np.sqrt(4*pow(2.6e-3,2)+pow(2.1e-3,2)),
 			sunshape='pillbox',
 			sunshape_param=np.degrees(4.65e-3),
-			num_rays=int(1e6),
+			num_rays=int(5e6),
 			latitude=37.56,
 			)
 		print('	Equivalent slope error: %.2f [mrad]'%(0.5*1e3*np.sqrt(4*pow(2.6e-3,2)+pow(2.1e-3,2))))
 		# input the number of tube bundles, number of flowpaths, pipe outer diameter and flow path pattern
-		Model.flow_path_salt(num_bundle=18,num_fp=2,D0=45.,pattern='NES-NWS') 
+		Model.flow_path_salt(num_bundle=18,num_fp=2,D0=45.,WT=1.5,pattern='NES-NWS') 
 		Model.annual_trimmed_field()
 
 	def test_touching(self):
