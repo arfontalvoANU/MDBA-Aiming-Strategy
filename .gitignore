@@ -1,6 +1,7 @@
 vtk
 *.pyc
 flux-table*
+flux_table*
 pos_and_aiming_new*
 build
 mdbapy.egg-info
@@ -14,3 +15,4 @@ RELT.csv
 pos_and_aiming_stand_by.csv
 simul
 CG_n*
+Tbool_*
