@@ -1024,7 +1024,7 @@ class Cyl_receiver():
 		self.R_fouling = 8.808e-5
 		self.ab = self.abs_t
 		self.em = self.ems_t
-		self.kp = 21.
+		self.kp = material.k((self.T_in + self.T_out)/2.)
 		self.H_rec = self.height
 		self.D_rec = 2.*self.radius
 		self.dz = self.H_rec/self.n_elems
