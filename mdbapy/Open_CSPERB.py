@@ -920,7 +920,7 @@ class Cyl_receiver():
 		self.Strt=Strt
 		return Strt
 
-	def secant(self, fun,x0,tol=1e-2, maxiter=100):
+	def secant(self, fun,x0,tol=1e-2, maxiter=100, debug=False):
 		x1 = (1.-1e-5)*x0
 		f0 = fun(x0)
 		f1 = fun(x1)
@@ -942,9 +942,12 @@ class Cyl_receiver():
 				f0 = f1
 				f1 = fun(x1)
 				alpha = 1
+				if self.vf_min > 0.1:
+					xs.append(x1)
+					fs.append(f1)
 
-			xs.append(x1)
-			fs.append(f1)
+			if debug:
+				print('	i:{0:g}	m:{1:.6f}	res:{2:e}	Nu min:{3}'.format(i,x1,f1,self.Numin))
 			i += 1
 
 		fmin = min(fs)
@@ -952,10 +955,14 @@ class Cyl_receiver():
 		xmin = xs[imin]
 		return xmin
 
+	def phis(self,x):
+		return N.exp(-1./x)/(N.exp(-1./x) + N.exp(-1./(1-x)))
+
 	def fun(self, m_flow):
 
 		T_temp = self.T_in*N.ones(self.nz+1)
 		To_temp = self.T_in*N.ones(self.nz)
+		self.vf_min = 1e10
 		for i in range(self.nz):
 			# Temperature
 			Tf = T_temp[i]
@@ -965,12 +972,20 @@ class Cyl_receiver():
 			kf = 0.443 + 1.9e-4 * (Tf - 273.15)
 			mu = 0.001 * (22.714 - 0.120 * (Tf - 273.15) + 2.281e-4 * pow(Tf - 273.15, 2.) - 1.474e-7 * pow(Tf - 273.15, 3.))
 			C = 1396.0182 + 0.172 * Tf
+			rho = 2090. - 0.636*(Tf - 273.15)
+			self.vf_min = min(self.vf_min, m_flow/self.area/rho)
 			# Nusselt
 			Re = m_flow * self.d / (self.area * mu)    # HTF Reynolds number
 			Pr = mu * C / kf                           # HTF Prandtl number
-			f = pow(1.82*N.log10(Re) - 1.64, -2.)
-			Nu = (f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.))
-			Nu = max(Nu,4.36)
+			if Re >= 4e3:
+				f = pow(1.82*N.log10(Re) - 1.64, -2.)
+				Nu = (f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.))
+			elif Re > 2e3 and Re < 4e3:
+				f = 64/Re + self.phis((Re-2e3)/2e3)*(pow(1.82*N.log10(Re) - 1.64, -2.) - 64/Re)
+				Nu = 4.36 + self.phis((Re-2e3)/2e3)*((f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.)) - 4.36)
+			else:
+				f = 64/Re
+				Nu = 4.36
 			hf = Nu*kf/self.d
 			# Convective heat transfer
 			hf = 1./(1./hf + self.R_fouling)
@@ -986,15 +1001,14 @@ class Cyl_receiver():
 			qnet = hf*(Ti - Tf)
 			qnet = N.concatenate((N.flip(qnet[:,1:-1],axis=1),qnet),axis=1)
 			Qnet = qnet.sum(axis=1)*self.Ri*self.dt*self.dz
-			if Re<1e-3:
+			T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
+			To_temp[i] = N.amax(To)
+			if Re<1e-3 or T_temp[i+1]>=self.Tmax or N.isnan(T_temp[i+1]):
 				T_temp[i+1] = T_temp[i]
 				To_temp[i] = T_temp[i]
-			else:
-				T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
-				To_temp[i] = N.amax(To)
 		self.T_f = T_temp
 		self.Text= To_temp
-		return abs(self.T_out-T_temp[self.nz])
+		return abs(T_temp[self.nz]-self.T_out)
 
 	def balance(self, HC, material, T_in, T_out, T_amb, h_conv_ext, filesave='/home/charles/Documents/Boulot/ASTRI/Sodium receiver_CMI/ref_case_result', load=1., air_velocity=5.):
 
@@ -1039,6 +1053,7 @@ class Cyl_receiver():
 		cosines = N.cos(N.linspace(0.0, N.pi, self.nt))
 		self.cosines = N.maximum(cosines, N.zeros(self.nt))
 		self.Tamb = T_amb
+		self.Tmax = HC.Tmax
 
 		if h_conv_ext == 'WSVH':
 			from .Convection_loss import cyl_conv_loss_coeff_WSVH
@@ -1183,7 +1198,8 @@ class Cyl_receiver():
 				q_conv = self.areas_fp[f]*self.h_conv_ext*(self.Text-T_amb)
 				q_net = (self.eff_abs*self.flux_fp[f]*self.areas_fp[f]-q_rad-q_conv)
 				self.q_net[fp] = q_net
-			print(yellow('	m_flow [kg/s]: %.6f	V_min [m/s]: %.6f	V_max [m/s]: %.6f	T_min [K]: %.6f	T_max [K]: %.6f	T_out [C]: %.2f'%(res,N.amin(V),N.amax(V),N.amin(self.T_f),N.amax(self.T_f),self.T_f[self.nz]-273.15)))
+			print(yellow('	m_flow [kg/s]: {0:.6f}	V_min [m/s]: {1:.6f}	V_max [m/s]: {2:.6f}	T_min [C]: {3:.2f}	T_max [C]: {4:.2f}	T_out [C]: {5:.2f}'.format(
+				res, V.min(), V.max(), self.T_f.min()-273.15, self.T_f.max()-273.15, self.T_f[self.nz]-273.15)))
 			self.T_HC[f] = self.T_f
 			self.V[fp] = V
 			self.m[f] = res*self.n_tubes[f]
