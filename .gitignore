@@ -20,5 +20,7 @@ FLUX_fp*
 MFLOW_Solstice*
 HALTs_Solstice*
 OELTs_Solstice*
-tests/TEST-COOPTIMISATION-SALT/*_peakFlux.*
-tests/TEST-COOPTIMISATION-SALT/flowpath.csv
+tests/*/*_peakFlux.*
+tests/*/flowpath.csv
+tests/*/flux_map.png
+tests/*/field.png
