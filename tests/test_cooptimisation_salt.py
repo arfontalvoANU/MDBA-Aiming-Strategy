@@ -7,7 +7,8 @@ import os
 import numpy as np
 import pickle
 from scipy.interpolate import interp2d
-
+import nitrateSaltPeakFlux as nspf
+import PostProcessing as pp
 
 class TestCooptimisationSalt(unittest.TestCase):
 	def setUp(self):
@@ -26,7 +27,8 @@ class TestCooptimisationSalt(unittest.TestCase):
 		from mdbapy.python_postprocessing import proces_raw_results, get_heliostat_to_receiver_data
 		from mdbapy.SOLSTICE import SolsticeScene
 
-		casedir='TEST-COOPTIMISATION-SALT'
+		casedir=os.path.abspath(
+			os.path.join(os.path.dirname(__file__), 'TEST-COOPTIMISATION-SALT'))
 		self.tablefile=casedir+'/OELT_Solstice.motab'
 
 		if not os.path.exists(casedir):
@@ -42,7 +44,7 @@ class TestCooptimisationSalt(unittest.TestCase):
 			rec_material='Incoloy800H',
 			r_diameter=8.5,
 			r_height=10.5,
-			fluxlimitpath='../data/201015_N08811_thermoElasticPeakFlux_velocity_salt',
+			fluxlimitpath=casedir,
 			SM=2.4,
 			oversizing=1., 	
 			delta_r2=0.9,
@@ -58,8 +60,13 @@ class TestCooptimisationSalt(unittest.TestCase):
 			)
 		print('	Equivalent slope error: %.2f [mrad]'%(0.5*1e3*np.sqrt(4*pow(2.6e-3,2)+pow(2.1e-3,2))))
 		# input the number of tube bundles, number of flowpaths, pipe outer diameter and flow path pattern
-		Model.flow_path_salt(num_bundle=18,num_fp=2,D0=45.,WT=1.5,pattern='NES-NWS') 
-		Model.annual_trimmed_field()
+		Model.flow_path_salt(num_bundle=18,num_fp=2,D0=22.4,WT=1.2,pattern='NES-NWS')
+		nspf.fluxLim(Model.D0,Model.WT,os.path.join(casedir,Model.material_name),Model.mat)
+		Model.annual_trimmed_field([1.00,1.39,0.87,0.56])
+		res=pp.PostProcess([1.00,1.39,0.87,0.56],num_fp=2,num_el=450,casedir=casedir,latitude=Model.latitude)
+		res.get_fluxes()
+		res.get_mflow()
+		res.Tables()
 
 	def test_touching(self):
 		if os.path.exists(self.tablefile):

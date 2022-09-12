@@ -111,10 +111,16 @@ class one_key_start:
 		self.rec_material=rec_material	
 		if rec_material=='Haynes230':
 			self.rec_material_model=Haynes230()
+			self.material_name='N06230'
+			self.mat='A230'
 		elif rec_material=='Inconel740H':
 			self.rec_material_model=Inconel740H()
+			self.material_name='N07740'
+			self.mat='740H'
 		elif rec_material=='Incoloy800H':
 			self.rec_material_model=Incoloy800H()
+			self.material_name='N08810'
+			self.mat='800H'
 		else:
 			print('ERROR: receiver material not found')
 
@@ -360,6 +366,7 @@ class one_key_start:
 		self.WT=WT
 		self.pattern=pattern
 		self.num_pass=num_bundle/2
+		self.flux_limits_file='%s/%s_OD%.2f_WT%.2f_peakFlux.csv'%(self.fluxlimitpath,self.material_name, self.D0,self.WT)
 		
 	def MDBA_aiming_new(self,dni,phi,elevation): # MDBA
 		self.num_hst=int(len(np.loadtxt(self.csv_trimmed,delimiter=',', skiprows=2))) # the num hst for the large field
@@ -543,7 +550,7 @@ class one_key_start:
 		return Defocus,MDBA_results
 
 	
-	def annual_trimmed_field(self): # OELT and RELT generations
+	def annual_trimmed_field(self,DNI_ratio): # OELT and RELT generations
 
 		self.num_hst=int(len(np.loadtxt(self.csv_trimmed,delimiter=',', skiprows=2))) # the num hst for the large field
 		flowpath=np.loadtxt('%s/flowpath.csv'%(self.casedir), dtype=str, delimiter=',')
@@ -558,7 +565,7 @@ class one_key_start:
 		N=10  # for lammda, ecliptic longitude
 		M=24  # for omega
 		F=np.arange((N+1)*(M+1)*7,dtype=float).reshape(N+1,M+1,7) # the OELT, 0-field eff, 1-unavail,2-cosine, 3-reflective,4-sb,5-att,6-spi
-		
+
 		Lammda=np.linspace(-np.pi,np.pi,N+1)
 		Omega=np.linspace(-np.pi,np.pi,M+1)
 		att_factor=self.attenuation(self.csv_trimmed)
@@ -570,7 +577,6 @@ class one_key_start:
 		sun=SunPosition()
 		F[:,:,:]=0.
 		Defocus=F[:,:,0]==0
-		Tbool=F[:,:,0]==0
 		d=0
 		for d in range(int(len(DNI_ratio))):
 			for n in range(3,8):
@@ -587,15 +593,7 @@ class one_key_start:
 						continue
 					dni=self.get_I(elevation)
 					Defocus[n,m],F[n,m,:]=self.MDBA_aiming_new(dni=dni*DNI_ratio[d],phi=phi,elevation=elevation)
-
 					shutil.copy('%s/flux-table'%self.casedir,'%s/flux_table_n%s_m%s_d%s'%(self.casedir,n,m,DNI_ratio[d]))
-					fileo = open(self.casedir+'/flux-table','rb')
-					data = pickle.load(fileo)
-					fileo.close()
-					Tbool[n,m] = (abs(data['T_HC'][0][450] - self.T_out) < 0.1) and (abs(data['T_HC'][1][450] - self.T_out) < 0.1)
-					print(Tbool[n,m])
-
-					print('	OPTICAL EFFICIENCY',F[n,m,:])
 
 					# generate the RELT
 					if d==0:
@@ -620,31 +618,24 @@ class one_key_start:
 								results_table=np.append(results_table,results[3:])
 					#print('results_table', results_table)					
 
-
-
 				for m in range(int(0.5*M)+1,M+1):
 					F[n,m,:]=F[n,M-m,:]
 					Defocus[n,m]=Defocus[n,M-m]
-					Tbool[n,m]=Tbool[n,M-m]
 			
-			# symmetric due to season		
+			# symmetric due to season
 			for n in range(3):
 				F[n,:,:]=F[5-n,:,:]
 				Defocus[n,:]=Defocus[5-n,:]
-				Tbool[n,:]=Tbool[5-n,:]
 			
 			for n in range(8,11):
 				F[n,:,:]=F[15-n,:,:]
 				Defocus[n,:]=Defocus[15-n,:]
-				Tbool[n,:]=Tbool[15-n,:]
 			
 			for n in range(N+1):
 				for m in range(M+1):
 					if F[n,m,0]==0:
 						Defocus[n,m]=False
-						Tbool[n,m]=False
 			np.savetxt('%s/Defocus_%s.csv'%(self.casedir,DNI_ratio[d]), Defocus, fmt='%s', delimiter=',')
-			np.savetxt('%s/Tbool_%s.csv'%(self.casedir,DNI_ratio[d]), Tbool, fmt='%s', delimiter=',')
 			# to output F
 			F_output=np.arange((N+2)*(M+2),dtype=float).reshape(N+2,M+2)
 			F_output[0,1:]=Omega/np.pi*180.
@@ -682,9 +673,8 @@ class one_key_start:
 		table=np.loadtxt('%s/F_optic_1.0.csv'%self.casedir,delimiter=',')
 		coefs_T,coefs,eff_abs,eff_emi,A_rec=receiver_correlation(self.r_diameter,self.r_height,folder=self.casedir)
 
-		
 		output_matadata_motab(table, field_type='surrounding', aiming='MDBA', n_helios=self.num_hst, A_helio=self.hst_w*self.hst_h, eff_design=Equinox[0], 
-		  d_receiver=self.r_diameter, h_receiver=self.r_height, H_tower=self.tower_h, eff_rec_design=Equinox[1], coefs_T=coefs_T, coefs=coefs, eff_abs=eff_abs, eff_emi= eff_emi,SM=self.SM, savedir='%s/OELT_Solstice.motab'%self.casedir)
+			d_receiver=self.r_diameter, h_receiver=self.r_height, H_tower=self.tower_h, eff_rec_design=Equinox[1], coefs_T=coefs_T, coefs=coefs, eff_abs=eff_abs, eff_emi= eff_emi,SM=self.SM, savedir='%s/OELT_Solstice.motab'%self.casedir)
 				
 	def HT_model(self,T_amb,V_wind,overflux=True): # receiver heat balance model
 
@@ -714,15 +704,6 @@ class one_key_start:
 			h_conv_ext='SK', 
 			filesave=self.casedir+'/flux-table',air_velocity=V_wind)
 
-		if self.rec_material=='Haynes230':
-			material_name='N06230'
-		elif self.rec_material=='Inconel740H':
-			material_name='Incoloy800H'
-		elif self.rec_material=='Incoloy800H':
-			material_name='N08811'
-	
-		flux_limits_file='%s/%s_OD%.2f_WT%.2f_peakFlux.csv'%(self.fluxlimitpath,material_name, self.D0,self.WT)
-	
 		results,aiming_results,vel_max=tower_receiver_plots(
 			files=self.casedir+'/flux-table', 
 			efficiency=False, 
@@ -731,7 +712,7 @@ class one_key_start:
 			flow_paths=True,
 			saveloc=None, 
 			billboard=False, 
-			flux_limits_file=flux_limits_file,
+			flux_limits_file=self.flux_limits_file,
 			C_aiming=self.C_aiming,overflux=overflux)
 		
 		vel_max_2=np.ones(self.num_bundle) # no considered velocity limit for salt receiver
