@@ -16,3 +16,9 @@ pos_and_aiming_stand_by.csv
 simul
 CG_n*
 Tbool_*
+FLUX_fp*
+MFLOW_Solstice*
+HALTs_Solstice*
+OELTs_Solstice*
+tests/TEST-COOPTIMISATION-SALT/*_peakFlux.*
+tests/TEST-COOPTIMISATION-SALT/flowpath.csv
