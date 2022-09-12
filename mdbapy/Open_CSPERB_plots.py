@@ -232,7 +232,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		cbar.set_label(r'$\dot{q}^{\prime \prime}_\mathrm{abs}$ [MW.m$^{-2}$]')
 
 		plt.figtext(0.25, 0.01, '(a)')
-		plt.savefig(open(saveloc+'_3D_maps.png','wb'), dpi=400)
+		plt.savefig('%s_3D_maps.png'%saveloc, dpi=400)
 		plt.clf()
 		plt.close('all')
 
@@ -283,7 +283,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 
 		plt.figtext(0.75, 0.01, '(b)')
 
-		plt.savefig(open(saveloc+'_3D_maps.png','wb'), dpi=400)
+		plt.savefig('%s_3D_maps.png'%saveloc, dpi=400)
 		plt.clf()
 		plt.close('all')
 
@@ -349,7 +349,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		cbar = plt.colorbar(mp, orientation='horizontal', pad=0.1, shrink=0.8)
 		cbar.set_label(r'$\dot{q}^{\prime \prime}_\mathrm{in}$ [MW.m$^{-2}$]')
 
-		plt.savefig(open(saveloc+'_3D_flux.png','wb'), dpi=400)
+		plt.savefig('%s_3D_flux.png'%saveloc, dpi=400)
 		plt.clf()
 		plt.close('all')
 
@@ -414,7 +414,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		cbar = plt.colorbar(mp, orientation='horizontal', pad=0.1, shrink=0.8)
 		cbar.set_label(r'${T_\mathrm{w,ext}}$ [$^{\circ}$C]')
 
-		plt.savefig(open(saveloc+'_3D_T.png','wb'), dpi=400)
+		plt.savefig('%s_3D_T.png'%saveloc, dpi=400)
 		plt.clf()
 		plt.close('all')
 		
@@ -479,7 +479,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		cbar = plt.colorbar(mp, orientation='horizontal', pad=0.1, shrink=0.8)
 		cbar.set_label(r'$\dot{q}^{\prime \prime}_\mathrm{abs}$ [MW.m$^{-2}$]')
 
-		plt.savefig(open(saveloc+'_3D_Q-net.png','wb'), dpi=400)
+		plt.savefig('%s_3D_Q-net.png'%saveloc, dpi=400)
 		plt.clf()
 
 	if flow_paths:
@@ -506,7 +506,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.subplot(len(fp),1,1)
 		plt.legend(loc=3,ncol=3, borderaxespad=0, bbox_to_anchor=(0.,1.05))
 
-		#plt.savefig(open(saveloc+'_Temp_fp.png','wb'), dpi=400)
+		#plt.savefig('%s_Temp_fp.png'%saveloc, dpi=400)
 		#plt.close('all')
 		'''
 		bot=0.08
@@ -648,7 +648,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 					plt.xlabel('Flow path length (m)',fontsize=size)
 			ax.tick_params(axis='both', which='major', labelsize=size,direction='in')
 			ax.locator_params(nbins=5)
-		plt.savefig(open(saveloc+'_flux_fp.png','wb'), dpi=200)
+		plt.savefig('%s_flux_fp.png'%saveloc, dpi=200)
 		plt.close('all')
 		plt.clf()
 		aiming_results=[Success,Positive,A_over,C_safe,C_net,S_ratio]
@@ -1014,7 +1014,7 @@ def flow_path_plot(files='/home/charles/Documents/Boulot/These/Sodium receiver_C
 		plt.ylabel('${v_\mathrm{Na}}$ [m.s$^{-1}$]')
 
 
-		plt.savefig(open(saveloc+'_fp_%s.png'%str(flow_path),'wb'), dpi=400)
+		plt.savefig('%s_fp_%s.png'%(saveloc,str(flow_path)), dpi=400)
 		plt.clf()
 		plt.close('all')
 		
@@ -1284,7 +1284,7 @@ def flow_path_plot_billboard(files='/home/charles/Documents/Boulot/These/Sodium 
 		plt.ylabel('${v_\mathrm{Na}}$ [m.s$^{-1}$]')
 
 
-		plt.savefig(open(saveloc+'_fp_%s.png'%str(flow_path),'wb'), dpi=400)
+		plt.savefig('%s_fp_%s.png'%(saveloc,str(flow_path)), dpi=400)
 		plt.clf()
 		plt.close('all')
 
