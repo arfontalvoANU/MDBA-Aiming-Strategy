@@ -16,6 +16,7 @@ from functools import partial
 from multiprocessing import Pool
 from tqdm import tqdm
 import warnings
+import pickle
 
 import colorama
 colorama.init()
@@ -656,6 +657,58 @@ class receiver_cyl:
 			axes[1,3].set_ylabel(r'$T_\mathrm{fluid}$ [\textdegree C]')
 			plt.tight_layout()
 			plt.savefig(os.path.join(casedir,'%s.png'%case),dpi=300)
+
+	def thermal_verification(self,filename):
+
+		# Getting the data
+
+		fileo = open(filename,'rb')
+		data = pickle.load(fileo)
+		fileo.close()
+
+		num_fp = len(data['fp'])
+		z = np.linspace(0,1,self.nz)
+
+		Ti = []
+		To = []
+		si = []
+		so = []
+
+		for fp in range(num_fp):
+			# Instantiating receiver model
+			h_ext = data['h_conv_ext']
+			Tamb = data['T_amb']
+			CG = flux_in = data['flux_in'][fp]
+			m_flow_tb = data['m'][fp]/data['n_tubes'][fp]
+
+			# Instantiating variables
+			Tf = self.T_in*np.ones(self.nz+1)
+			T_o = np.zeros(self.nz)
+			T_i = np.zeros(self.nz)
+			s_o = np.zeros(self.nz)
+			s_i = np.zeros(self.nz)
+
+			# Running thermal model
+			for k in range(self.nz):
+				Qnet = self.Temperature(m_flow_tb, Tf[k], Tamb, CG[k], h_ext)
+				C = self.specificHeatCapacityCp(Tf[k])*m_flow_tb
+				Tf[k+1] = Tf[k] + Qnet/C
+				T_o[k] = self.To
+				T_i[k] = self.Ti
+				sigmaEq_o = np.sqrt((
+				(self.stress[:,:,0] - self.stress[:,:,1])**2.0 + 
+				(self.stress[:,:,1] - self.stress[:,:,2])**2.0 + 
+				(self.stress[:,:,2] - self.stress[:,:,0])**2.0 + 
+				6.0 * (self.stress[:,:,3]**2.0 + self.stress[:,:,4]**2.0 + self.stress[:,:,5]**2.0))/2.0)
+
+				s_o[k] = sigmaEq_o[0,0]/1e6
+				s_i[k] = sigmaEq_o[0,1]/1e6
+
+			Ti.append(T_i)
+			To.append(T_o)
+			si.append(s_i)
+			so.append(s_o)
+		return Ti,To,si,so
 
 class heuristics:
 	def __init__(self, res='heuristics_res.mat', mat='800H', thermat = 'base', defomat='const_base', damat='base', folder='.'):
