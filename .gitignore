@@ -24,3 +24,4 @@ tests/*/*_peakFlux.*
 tests/*/flowpath.csv
 tests/*/flux_map.png
 tests/*/field.png
+tests/HEURISTICS-SALT
