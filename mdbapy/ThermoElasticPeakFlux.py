@@ -67,16 +67,13 @@ def findFlux(flux, s, f, i, point):
 
 ##################################### MAIN #####################################
 
-def fluxLim(OD,WT,fname,mat):
+def fluxLim(OD,WT,fname,mat,vfs,T_int):
 	if not os.path.exists('{0}_OD{1:.2f}_WT{2:.2f}_peakFlux.csv'.format(fname, OD, WT)):
 		h_ext=10. # convective loss due to wind W/(m2.K)
 		salt = coolant.nitrateSalt(False)
 		salt.update(723.15)
 		iterator='inline'
 		nr=6; nt=61
-
-		T_int = np.linspace(290, 565, 12)
-		T_int = np.append(T_int,600) + 273.15
 
 		""" Instantiating figure and subplots"""
 		fig = plt.figure(figsize=(3.5, 3.5))
@@ -87,7 +84,8 @@ def fluxLim(OD,WT,fname,mat):
 		b = OD/2e3		 # outside tube radius [mm->m]
 		a = (b-WT*1e-3)	 # inside tube radius [mm->m]
 		g = nts.Grid(nr=nr, nt=nt, rMin=a, rMax=b) # nr, nt -> resolution
-		vfs = np.array([0, 1., 2., 3., 4.])
+		vfs = np.append(vfs,0.)
+		vfs.sort()
 
 		""" Looping velocities"""
 		for vf in vfs[1:]:
