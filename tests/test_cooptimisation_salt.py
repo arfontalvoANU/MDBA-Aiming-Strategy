@@ -65,6 +65,7 @@ class TestCooptimisationSalt(unittest.TestCase):
 		T_int = np.append(T_int,600.) + 273.15
 		ThermoElasticPeakFlux.fluxLim(Model.D0,Model.WT,os.path.join(casedir,Model.material_name),Model.mat,vfs,T_int)
 		Model.annual_trimmed_field()
+		Model.Tbool()
 		Model.get_fluxes()
 		Model.get_mflow()
 		Model.Tables()

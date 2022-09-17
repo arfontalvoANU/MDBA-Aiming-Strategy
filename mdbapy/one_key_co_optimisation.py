@@ -827,8 +827,8 @@ class one_key_start:
 		N=10  # for lammda, ecliptic longitude
 		M=24  # for omega
 
-		Lammda=np.linspace(-np.pi,np.pi,self.N+1)
-		Omega=np.linspace(-np.pi,np.pi,self.M+1)
+		Lammda=np.linspace(-np.pi,np.pi,N+1)
+		Omega=np.linspace(-np.pi,np.pi,M+1)
 		sun=SunPosition()
 
 		for r,d in enumerate(self.dni):
