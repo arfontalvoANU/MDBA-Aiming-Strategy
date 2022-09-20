@@ -26,7 +26,7 @@ class SaltAnnualTrimmedField:
 			,'N08810':'Incoloy800H'
 			,'N07740':'Inconel740H'}
 
-		case = '%s_OD%.2f_WT%.2f_%s'%(material,D0,WT,T)
+		case = '%s_OD%.2f_WT%.2f_%d'%(material,D0,WT,T)
 		print('	',case)
 		casedir=os.path.abspath(
 			os.path.join(os.path.dirname(__file__), case))
@@ -77,8 +77,8 @@ class SaltAnnualTrimmedField:
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Run annual simulation')
 	parser.add_argument('--material', type=str, default='N08810')
-	parser.add_argument('--OD', type=float, default=45.0)
-	parser.add_argument('--WT', type=float, default=1.5)
+	parser.add_argument('--OD', type=float, default=22.4)
+	parser.add_argument('--WT', type=float, default=1.2)
 	parser.add_argument('--TF', type=float, default=565)
 	args = parser.parse_args()
 
