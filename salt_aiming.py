@@ -392,62 +392,78 @@ if __name__=='__main__':
 	r_diameter=8.5        # Receiver diameter [m]
 	bins=50               # Vertical bins
 	tower_h=114.75        # Tower height [m] (Floor to receiver bottom)
-	azimuth=0.0           # Solar azimuth angle [degrees]
-	elevation=55.15       # Solar elevation angle [degrees]
-	DNI=950.0             # Beam irradiance [W/m2]
 	num_fp=2              # Number of flow path
-	D0=42.16              # Panel tube OD [mm]
+	D0=22.4               # Panel tube OD [mm]
 	num_rays=int(5e6)     # Number of rays
 
-	# Creating receiver model
-	Model=one_key_start(
-		folder,
-		source_path,
-		num_bundle,
-		num_fp,
-		r_height,
-		r_diameter,
-		bins,
-		tower_h,
-		azimuth,
-		elevation,
-		DNI,
-		D0)
+	x,y = np.meshgrid(np.linspace(-180,180,num_bundle),np.linspace(0,1,bins))
 
-	# Getting the azimuth angle, elevation angle and DNI
-	sun=SunPosition()
-	dec=0
-	hra=0
-	daytime,sunrise=sun.solarhour(dec, Model.latitude)
-	zen=sun.zenith(Model.latitude, dec, hra)
-	azi=sun.azimuth(Model.latitude, zen, dec, hra)
-	if zen > 90.0:
-		zen = 90.0
-	ele=90.0-zen
-	# Converting azimuth into SOLSTICE convention
-	azimuth = azi
-	elevation = ele
-	azi = -(90 + azi)
-	if (azi>=360.0 or azi<0.0):
-		azi = (azi+360.0)%(360.0)
+	import colorama
+	colorama.init()
 
-	DNI=Model.get_I_Meinel(ele)
-	Model=one_key_start(
-		folder,
-		source_path,
-		num_bundle,
-		num_fp,
-		r_height,
-		r_diameter,
-		bins,
-		tower_h,
-		azi,
-		ele,
-		DNI,
-		D0)
-	C_start = 0.5
-	E_start = 2.0
-	A_start = 0.5
-	# Running aiming for design point
-	Model.sweeping_algorithm(C_start,E_start,A_start)
+	def yellow(text):
+		return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
+	plt.rc('text', usetex=True)
+	plt.rc('font', size=16)
+
+	for row in range(119,120):
+		import scipy.io
+		data=scipy.io.loadmat('flux_modelica.mat')
+		CG1=data['CG1'][row,:].flatten()
+		CG2=data['CG2'][row,:].flatten()
+
+		azi=data['azi'].flatten()[row]
+		ele=data['ele'].flatten()[row]
+		dni=data['dni'].flatten()[row]
+
+		mat1=np.zeros((bins,num_bundle/2))
+		mat2=np.zeros((bins,num_bundle/2))
+		res=1
+		for j in range(num_bundle/2):
+			for i in range(bins):
+				if j%2==0:
+					mat1[i,j]=CG1[res]
+					mat2[i,j]=CG2[res]
+				else:
+					mat1[49-i,j]=CG1[res]
+					mat2[49-i,j]=CG2[res]
+				res+=1
+		FluxI = np.c_[mat2[:,::-1],mat1]
+
+		# Creating receiver model
+		Model=one_key_start(folder,source_path,num_bundle,num_fp,r_height,r_diameter,bins,tower_h,azi,ele,dni,D0)
+
+		C_start = 0.5
+		E_start = 2.0
+		A_start = 0.5
+		# Running aiming for design point
+		if dni>0 and ele>8.0:
+#			Model.sweeping_algorithm(C_start,E_start,A_start)
+			FluxS=np.genfromtxt(os.path.join(basefolder,'flux-table.csv'),delimiter=',',skip_header=7)[:,1:]*1e3
+			Erms=np.sqrt(np.size(FluxS)*np.sum(pow(FluxS-FluxI,2)))/np.sum(FluxS)*100
+			print(yellow('	row: {0}	E_rms (BAR):	{1:.2f} %'.format(row,Erms)))
+			ssize=16
+			fig,axes = plt.subplots(1,1)
+			z = FluxS/1e3
+			z_min, z_max = z.min(), z.max()
+			c = axes.pcolormesh(x, y, z, vmin = z_min, vmax = z_max)
+			axes.set_ylabel(r'Receiver height (\%)', fontsize=ssize)
+			axes.set_xlabel(r'$\gamma$ (\textdegree) East(+)/West(-)', fontsize=ssize)
+			cb = plt.colorbar(c)
+			cb.set_label(label=r'Incident flux (kW/m$^2$)', fontsize=ssize)
+			plt.tight_layout()
+			plt.savefig(os.path.join(basefolder,'Solstice_%d.png'%row),dpi=300)
+			plt.close('all')
+
+			fig,axes = plt.subplots(1,1)
+			z = FluxI/1e3
+#			z_min, z_max = z.min(), z.max()
+			c = axes.pcolormesh(x, y, z, vmin = z_min, vmax = z_max)
+			axes.set_ylabel(r'Receiver height (\%)', fontsize=ssize)
+			axes.set_xlabel(r'$\gamma$ (\textdegree) East(+)/West(-)', fontsize=ssize)
+			cb = plt.colorbar(c)
+			cb.set_label(label=r'Incident flux (kW/m$^2$)', fontsize=ssize)
+			plt.tight_layout()
+			plt.savefig(os.path.join(basefolder,'Modelica_%d.png'%row),dpi=300)
+			plt.close('all')
