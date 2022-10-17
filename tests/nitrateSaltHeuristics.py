@@ -292,6 +292,8 @@ class receiver_cyl:
 		"""
 		if self.coolant == 'salt':
 			eta = 0.001 * (22.714 - 0.120 * (T - 273.15) + 2.281e-4 * pow((T - 273.15),2) - 1.474e-7 * pow((T - 273.15),3))
+			emax = 0.001 * (22.714 - 0.120 * 600. + 2.281e-4 * pow(600.,2) - 1.474e-7 * pow(600.,3))
+			eta = np.maximum(eta,emax)
 		else:
 			eta = np.exp(-6.4406 - 0.3958 * np.log(T) + 556.835/T)
 		return eta
@@ -319,6 +321,9 @@ class receiver_cyl:
 		else:
 			C = 1000 * (1.6582 - 8.4790e-4 * T + 4.4541e-7 * pow(T,2) - 2992.6 * pow(T,-2))
 		return C
+
+	def phis(self,x):
+		return np.exp(-1./x)/(np.exp(-1./x) + np.exp(-1./(1-x)))
 
 	def Temperature(self, m_flow, Tf, Tamb, CG, h_ext):
 		"""
@@ -352,21 +357,34 @@ class receiver_cyl:
 		# HTF internal flow variables
 		Re = m_flow * self.d / (self.area * mu)    # HTF Reynolds number
 		Pr = mu * C / kf                           # HTF Prandtl number
+		Re_zer = np.where(Re<=0)[0]
+		Re_pos = np.where(Re>0)[0]
+		Re_lam = np.where((Re>0)     & (Re<=2e3))[0]
+		Re_tra = np.where((Re>2e3) & (Re<4e3))[0]
+		Re_tur = np.where(Re>=4e3)[0]
+		f = np.zeros_like(Re)
+		Nu= 4.36*np.ones_like(Re)
+		Pr_neg = np.where(Pr<=0)[0]
 
 		if self.coolant == 'salt':
 			if self.Dittus:
 				Nu = 0.023 * pow(Re, 0.8) * pow(Pr, 0.4)
 			else:
-				f = pow(1.82*np.log10(np.maximum(Re,1)) - 1.64, -2)
-				Nu = (f/8)*(Re - 1000)*Pr/(1 + 12.7*pow(f/8, 0.5)*(pow(Pr,0.66)-1))
+				f[Re_lam] = 64/Re[Re_lam]
+				f[Re_tur] = pow(1.82*np.log10(Re[Re_tur]) - 1.64, -2)
+				f[Re_tra] = 64/Re[Re_tra] + self.phis((Re[Re_tra]-2e3)/2e3)*(pow(1.82*np.log10(Re[Re_tra]) - 1.64, -2.) - 64/Re[Re_tra])
+
+				Nu[Re_lam] = 4.36
+				Nu[Re_tur] = (f[Re_tur]/8)*(Re[Re_tur] - 1000)*Pr[Re_tur]/(1 + 12.7*pow(f[Re_tur]/8, 0.5)*(pow(Pr[Re_tur],0.66)-1))
+				Nu[Re_tra] = 4.36 + self.phis((Re[Re_tra]-2e3)/2e3)*((f[Re_tra]/8.)*(Re[Re_tra] - 1000.)*Pr[Re_tra]/(1. + 12.7*pow(f[Re_tra]/8., 0.5)*(pow(Pr[Re_tra], 0.66) -1.)) - 4.36)
+
 		else:
 			Nu = 5.6 + 0.0165 * pow(Re*Pr, 0.85) * pow(Pr, 0.01)
-		Nu = np.maximum(Nu,4.36)
 
 		# HTF internal heat transfer coefficient
 		hf = Nu * kf / self.d
 		if self.R_fouling>0:
-			hf = 1./(1./hf + self.R_fouling)
+			hf[Re_pos] = 1./(1./hf[Re_pos] + self.R_fouling)
 
 		# Calculating heat flux at circumferential nodes
 		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
@@ -384,7 +402,6 @@ class receiver_cyl:
 		Qnet[net_zero] = 0.0
 		_qnet[net_zero,:] = 0.0
 		self.qnet = _qnet
-		zeros = np.where(m_flow==0)[0]
 
 		for t in range(Ti.shape[0]):
 			BDp = self.Fourier(Ti[t,:])
@@ -548,6 +565,15 @@ class receiver_cyl:
 			(sigma_i[:,:,1] - sigma_i[:,:,2])**2.0 + 
 			(sigma_i[:,:,2] - sigma_i[:,:,0])**2.0 + 
 			6.0 * (sigma_i[:,:,3]**2.0 + sigma_i[:,:,4]**2.0 + sigma_i[:,:,5]**2.0))/2.0)
+
+		inv = np.where(T_o>self.T_max_fatigue)[0]
+		temp,T_o[inv,:] = np.meshgrid(np.ones((1,450)),Tf[inv,0].flatten())
+		temp,T_i[inv,:] = np.meshgrid(np.ones((1,450)),Tf[inv,0].flatten())
+		temp,Tf[inv,1:] = np.meshgrid(np.ones((1,450)),Tf[inv,0].flatten())
+		sigmaEq_o[inv,:] = 0.0
+		sigmaEq_i[inv,:] = 0.0
+		epsilon_o[inv,:,:] = 0.0
+		epsilon_i[inv,:,:] = 0.0
 
 		# Time to rupture
 		period = 24
@@ -873,6 +899,16 @@ if __name__=='__main__':
 		,mat=args.mat)
 
 	args.case=args.file.split('/')[-1].split('.mat')[0]
+	print('	Ri: %.2f'%(model.Ri*1000),
+		'	Ro: %.2f'%(model.Ro*1000),
+		'	alpha: %g'%model.l,
+		'	Young: %.1f'%(model.E/1e9),
+		'	poisson: %.2f'%model.nu,
+		'	kp: %s'%model.kp)
+	print('	SolarTherm res: %s'%args.file)
+	print('	Material: %s'%args.mat)
+	print('	Case: %s'%args.case)
+	print('	Casedir: %s'%args.casedir)
 	model.run_heuristics(days=args.days,step=args.step,rfile=args.file,case=args.case,casedir=args.casedir)
 
 	seconds = time.time() - tinit
