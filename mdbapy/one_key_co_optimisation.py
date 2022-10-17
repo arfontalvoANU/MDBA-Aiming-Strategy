@@ -133,7 +133,7 @@ class one_key_start:
 		self.sunshape_param=sunshape_param
 		
 		self.SM=SM # solar multiple
-		self.dni = [1.00,1.39,0.87,0.56]
+		self.dni = [0.56,0.87,1.00,1.20,1.39]
 		
 	def big_field_generation(self): # generate a large field 
 		# generate and store 'pos_and_aiming.csv'
@@ -603,7 +603,7 @@ class one_key_start:
 					shutil.copy('%s/flux-table'%self.casedir,'%s/flux_table_n%s_m%s_d%s'%(self.casedir,n,m,DNI_ratio[d]))
 
 					# generate the RELT
-					if d==0:
+					if DNI_ratio[d]==1:
 						if n==3 or n==5 or n==7:
 							max_flux=read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True)
 							for i in range(int(len(T_amb_g))):
@@ -1009,8 +1009,8 @@ class one_key_start:
 			F = np.genfromtxt('%s/F_unavail_%s.csv'%(self.casedir,d),delimiter=',')
 			T = np.genfromtxt('%s/Tbool_%s.csv'%(self.casedir,d),delimiter=',')
 
-			f.write('double optics_%d(%d,%d)\n'%(r,E.shape[0],E.shape[1]))
-			g.write('double optics_%d(%d,%d)\n'%(r,E.shape[0],E.shape[1]))
+			f.write('double optics_%d(%d,%d)\n'%(r+1,E.shape[0],E.shape[1]))
+			g.write('double optics_%d(%d,%d)\n'%(r+1,E.shape[0],E.shape[1]))
 			for i in range(E.shape[0]):
 				for j in range(E.shape[1]):
 					if i==0:

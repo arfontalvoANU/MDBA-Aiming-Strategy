@@ -21,7 +21,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 ## uncomment following if not in ~/.config/matplotlib/matplotlibrc already
 plt.rc('text', usetex = True)
-plt.rcParams['text.latex.preamble'] = r"\usepackage{newtxtext,newtxmath,siunitx}"
 mpl.rc('figure.subplot', bottom=0.13, top=0.95)
 mpl.rc('figure.subplot', left=0.15, right=0.95)
 from matplotlib import colors, ticker, cm
@@ -124,12 +123,8 @@ def fluxLim(OD,WT,fname,mat,vfs,T_int):
 				TSod_met[i] = np.max(s.T)
 
 			ax.plot(T_int-273.15,fluxSalt*1e-6, label=r'U = {0} m/s'.format(vf))
-			ax.set_xlabel(r'\textsc{fluid temperature}, '+\
-						  '$T_\mathrm{f}$ (\si{\celsius})')
-			ax.set_ylabel(
-				r'\textsc{incident flux}, $\vec{\phi_\mathrm{q}}$ '+\
-				'(\si{\mega\watt\per\meter\squared})'
-			)
+			ax.set_xlabel(r'$T_\mathrm{f}$ (\textdegree C)')
+			ax.set_ylabel(r'$\vec{\phi_\mathrm{q}}$ (W/m$^2$)')
 			ax.legend(loc='best')
 			fig.tight_layout()
 			fig.savefig('{0}_OD{1:.2f}_WT{2:.2f}_peakFlux.pdf'.format(fname, OD, WT),
