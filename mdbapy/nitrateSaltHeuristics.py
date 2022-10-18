@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.rcParams['text.usetex'] = True
 mpl.rcParams['font.size'] = 14
-#mpl.rcParams['font.family'] = 'Times'
+mpl.rcParams['font.family'] = 'Times'
 import os, sys, math, scipy.io, argparse
 from scipy.interpolate import interp1d, RegularGridInterpolator
 import scipy.optimize as opt
@@ -34,7 +34,7 @@ sign = lambda x: math.copysign(1.0, x)
 
 def print_table_latex(model, data):
 	print('')
-	print('Cumulative creep and fatigue damage and projected receiver life for a nitrate-salt Gemasolar-like receiver. Material: UNS N08811.')
+	print('Cumulative creep and fatigue damage and projected receiver life for a nitrate-salt Gemasolar-like receiver.')
 	for i in range(int(model.nz/model.nbins)):
 		lb = model.nbins*i
 		ub = lb + model.nbins - 1
@@ -488,7 +488,7 @@ class receiver_cyl:
 
 		self.import_mat(rfile)                                                                                # Importing SolarTherm output
 		times = self.data[:,0]                                                                                # Get times
-		CG = self.data[:,self._vars['heliostatField.CG[1]'][2]:model._vars['heliostatField.CG[450]'][2]+1]    # Get fluxes
+		CG = self.data[:,self._vars['heliostatField.CG[1]'][2]:self._vars['heliostatField.CG[450]'][2]+1]    # Get fluxes
 		m_flow_tb = self.data[:,self._vars['heliostatField.m_flow_tb'][2]]                                    # Get mass flow rates
 		Tamb = self.data[:,self._vars['receiver.Tamb'][2]]                                                    # Get ambient temperatures
 		h_ext = self.data[:,self._vars['receiver.h_conv'][2]]                                                 # Get heat transfer coefficient due to external convection
@@ -533,11 +533,11 @@ class receiver_cyl:
 		Tf = self.T_in*np.ones((times.shape[0],self.nz+1))
 
 		for i in field_off:
-			Tf[i,:] = 293.15*np.ones((model.nz+1,))
+			Tf[i,:] = 293.15*np.ones((self.nz+1,))
 		for i in start:
-			Tf[i,:] = 533.15*np.ones((model.nz+1,))
+			Tf[i,:] = 533.15*np.ones((self.nz+1,))
 		for i in stop:
-			Tf[i,:] = 533.15*np.ones((model.nz+1,))
+			Tf[i,:] = 533.15*np.ones((self.nz+1,))
 		qnet = np.zeros((times.shape[0],2*self.nt-1,self.nz))
 
 		# Running thermal model
@@ -642,7 +642,7 @@ class receiver_cyl:
 		data['min_cycle'] = np.argmin(max_cycles)
 		data['max_creep'] = np.argmin(np.cumsum(Dc, axis=0))
 		data['max_fatig'] = np.argmin(np.cumsum(Df, axis=0))
-		print_table_latex(model,data)
+		print_table_latex(self,data)
 		scipy.io.savemat(os.path.join(casedir,'%s.mat'%case),data)
 
 		if (days[1] - days[0])==1:
