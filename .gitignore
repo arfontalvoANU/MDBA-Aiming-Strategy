@@ -28,3 +28,5 @@ tests/HEURISTICS-SALT
 tests/*.mat
 tests/_*
 tests/jobscript
+tests/*.hdf5
+tests/results_tmy*
