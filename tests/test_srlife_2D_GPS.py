@@ -2,6 +2,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+mpl.use('Agg')
 mpl.rcParams['text.usetex'] = True
 mpl.rcParams['font.size'] = 14
 mpl.rcParams['font.family'] = 'Times'
@@ -96,12 +97,12 @@ def run_problem(zpos,nz,progress_bar=True,folder=None,nthreads=4,load_state0=Fal
 	params["thermal"]["substep"] = 1               # Divide user-provided time increments into smaller values
 
 	params["structural"]["rtol"] = 1.0e-6          # Relative tolerance for NR iterations
-	params["structural"]["atol"] = 1.0e-8          # Absolute tolerance for NR iterations
+	params["structural"]["atol"] = 1.0e-4          # Absolute tolerance for NR iterations
 	params["structural"]["miter"] = 50             # Maximum newton-raphson iterations
 	params["structural"]["verbose"] = False        # Verbose solve
 
 	params["system"]["rtol"] = 1.0e-6              # Relative tolerance
-	params["system"]["atol"] = 1.0e-8              # Absolute tolerance
+	params["system"]["atol"] = 1.0e-4              # Absolute tolerance
 	params["system"]["miter"] = 20                 # Number of permissible nonlinear iterations
 	params["system"]["verbose"] = debug            # Print a lot of debug info
 
@@ -159,10 +160,11 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 
 	model.import_mat(rfile)                                                                                 # Importing SolarTherm output
 	times = model.data[:,0]                                                                                 # Get times
-	CG = model.data[:,model._vars['heliostatField.CG[1]'][2]:model._vars['heliostatField.CG[450]'][2]+1]    # Get fluxes
-	m_flow_tb = model.data[:,model._vars['heliostatField.m_flow_tb'][2]]                                    # Get mass flow rates
-	Tamb = model.data[:,model._vars['receiver.Tamb'][2]]                                                    # Get ambient temperatures
-	h_ext = model.data[:,model._vars['receiver.h_conv'][2]]                                                 # Get heat transfer coefficient due to external convection
+	CG = model.data[:,model._vars['CG[1]'][2]:model._vars['CG[450]'][2]+1]                                  # Get fluxes
+	m_flow_tb = model.data[:,model._vars['m_flow_tb'][2]]                                                   # Get mass flow rates
+	Tamb = model.data[:,model._vars['data.Tdry'][2]]                                                        # Get ambient temperatures
+	h_ext = model.data[:,model._vars['h_conv'][2]]                                                          # Get heat transfer coefficient due to external convection
+	con_state = model.data[:,model._vars['con_state'][2]]                                                   # Concentrator states
 
 	# Filtering times
 	index = []
@@ -170,46 +172,46 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 	time_lb = days[0]*86400
 	time_ub = days[1]*86400
 	print(yellow('	Sorting times'))
+	step_ramp=min(300.,step)
 	for i in tqdm(range(len(times))):
-		if times[i]%step==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
-			index.append(i)
-			_times.append(times[i])
+		if con_state[i]==1:
+			if times[i]%7200.==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+				index.append(i)
+				_times.append(times[i])
+		elif con_state[i]==2 and con_state[i-1]==1:
+			if times[i-1] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+				index.append(i-1)
+				_times.append(times[i-1])
+		elif con_state[i]==2 or con_state[i]==5:
+			if times[i]%step_ramp==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+				index.append(i)
+				_times.append(times[i])
+		elif con_state[i]==5 and con_state[i+1]==1:
+			if times[i+1] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+				index.append(i+1)
+				_times.append(times[i+1])
+		else:
+			if times[i]%step==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+				index.append(i)
+				_times.append(times[i])
 
-	times = times[index].flatten()/3600.                                                                  # Filter times
-	CG = CG[index,:]                                                                                      # Filter fluxes
-	m_flow_tb = m_flow_tb[index]                                                                          # Filter mass flow rates
-	CG[np.where(m_flow_tb==0)[0],:] = 0.0                                                                 # Matching zero flow with zero flux
-	Tamb = Tamb[index]                                                                                    # Filter ambient temperature
-	h_ext = h_ext[index]                                                                                  # Filter heat transfer coefficient due to external convection
+	times = times[index].flatten()/3600.                                                                  # Filtered times, in hours
+	CG = CG[index,:]                                                                                      # Filtered fluxes
+	m_flow_tb = m_flow_tb[index]                                                                          # Filtered mass flow rates
+	Tamb = Tamb[index]                                                                                    # Filtered ambient temperature
+	h_ext = h_ext[index]                                                                                  # Filtered heat transfer coefficient due to external convection
+	con_state = con_state[index]                                                                          # Filtered concentrator states
+	ramp_up = np.where(con_state==2)[0]
+	full_ld = np.where(con_state==3)[0]
+	ramp_dw = np.where(con_state==5)[0]
 
 	# Instantiating variables
-	field_off = [0]
-	start = []
-	stop = []
-	for i in range(1,times.shape[0]-1):
-		if m_flow_tb[i]==0 and m_flow_tb[i+1]==0 and m_flow_tb[i-1]==0:
-			field_off.append(i)
-		if m_flow_tb[i]==0 and m_flow_tb[i+1]>0 and m_flow_tb[i-1]==0:
-			start.append(i)
-		if m_flow_tb[i]==0 and m_flow_tb[i+1]==0 and m_flow_tb[i-1]>0:
-			stop.append(i)
-
-	field_off.append(times.shape[0]-1)
-	sigma_o = np.zeros((times.shape[0],model.nz,6))
-	sigma_i = np.zeros((times.shape[0],model.nz,6))
-	epsilon_o = np.zeros((times.shape[0],model.nz,6))
-	epsilon_i = np.zeros((times.shape[0],model.nz,6))
-	T_o = np.zeros((times.shape[0],model.nz))
-	T_i = np.zeros((times.shape[0],model.nz))
-	Tf = model.T_in*np.ones((times.shape[0],model.nz+1))
-
-	for i in field_off:
-		Tf[i,:] = 293.15*np.ones((model.nz+1,))
-	for i in start:
-		Tf[i,:] = 533.15*np.ones((model.nz+1,))
-	for i in stop:
-		Tf[i,:] = 533.15*np.ones((model.nz+1,))
+	Tf = 293.15*np.ones((times.shape[0],model.nz+1))
+	Tf[full_ld,:] = model.T_in*np.ones_like(Tf[full_ld,:])
+	Tf[ramp_dw,:] = 533.15*np.ones_like(Tf[ramp_dw,:])
+	Tf[ramp_up,:] = 533.15*np.ones_like(Tf[ramp_up,:])
 	qnet = np.zeros((times.shape[0],2*model.nt-1,model.nz))
+	pressure = 0.1*np.ones_like(times)
 
 	# Running thermal model
 	print(yellow('	Running thermal model'))
@@ -217,13 +219,7 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 		Qnet = model.Temperature(m_flow_tb, Tf[:,k], Tamb, CG[:,k], h_ext)
 		C = model.specificHeatCapacityCp(Tf[:,k])*m_flow_tb
 		Tf[:,k+1] = Tf[:,k] + np.divide(Qnet, C, out=np.zeros_like(C), where=C!=0)
-		sigma_o[:,k,:] = model.stress[:,0,:]/1e6
-		sigma_i[:,k,:] = model.stress[:,1,:]/1e6
-		epsilon_o[:,k,:] = model.epsilon[:,0,:]
-		epsilon_i[:,k,:] = model.epsilon[:,1,:]
 		qnet[:,:,k] = model.qnet/1e6
-		T_o[:,k] = model.To
-		T_i[:,k] = model.Ti
 
 	# Getting internal pressure
 	pressure = np.where(m_flow_tb>0, 0.1, m_flow_tb)
@@ -331,6 +327,7 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 
 	plt.tight_layout()
 	plt.savefig('%s/results_%s_d%s'%(savefolder,case,days[1]))
+	plt.close(fig)
 
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Estimates average damage of a representative tube in a receiver panel')
@@ -343,20 +340,26 @@ if __name__=='__main__':
 	parser.add_argument('--savestate', type=bool, default=True, help='Save the last state of the last simulated day')
 	parser.add_argument('--step', type=float, default=1800, help='Simulation step. Default=1800')
 	parser.add_argument('--debug', type=bool, default=False, help='Debug option. Default=False')
+	parser.add_argument('--rfile', type=str, default='/home/arfontalvo/solartherm/examples/SimpleSystemOperation_res.mat')
 	args = parser.parse_args()
 
 	tinit = time.time()
-	run_gemasolar(
-		args.panel
-		,args.position
-		,args.days,args.nthreads
-		,args.clearSky
-		,args.load_state0
-		,args.savestate
-		,args.step
-		,args.debug
-		,rfile = '/home/arfontalvo/ownCloud/phd_update/damage/N06230/MDBA2ST_5DNIR_53SUNPOS/N06230_OD22.40_WT1.20_565.mat'
-		)
+	lb=args.days[0]
+	ub=args.days[1]
+	for i in range(lb,ub):
+		args.days=[i,i+1]
+		run_gemasolar(
+			 args.panel
+			,args.position
+			,args.days
+			,args.nthreads
+			,args.clearSky
+			,args.load_state0
+			,args.savestate
+			,args.step
+			,args.debug
+			,rfile = args.rfile
+			)
 	seconds = time.time() - tinit
 	m, s = divmod(seconds, 60)
 	h, m = divmod(m, 60)
