@@ -32,6 +32,8 @@ strMatNormal = lambda a: [''.join(s).rstrip() for s in a]
 strMatTrans  = lambda a: [''.join(s).rstrip() for s in zip(*a)]
 sign = lambda x: math.copysign(1.0, x)
 
+SODIR = os.path.join(os.getenv('HOME'),'solartherm/SolarTherm/Resources/Include/stress')
+
 def print_table_latex(model, data):
 	print('')
 	print('Cumulative creep and fatigue damage and projected receiver life for a nitrate-salt Gemasolar-like receiver.')
@@ -234,7 +236,7 @@ class receiver_cyl:
 		props = l*np.ones((3,3)) + 2*m*np.identity(3)
 		self.invprops = np.linalg.inv(props)
 		# Loading dynamic library
-		so_file = "%s/solartherm/SolarTherm/Resources/Include/stress/stress.so"%os.path.expanduser('~')
+		so_file = "%s/stress.so"%SODIR
 		stress = ctypes.CDLL(so_file)
 		self.fun = stress.curve_fit
 		self.fun.argtypes = [ctypes.c_int,
@@ -768,12 +770,18 @@ class heuristics:
 
 	def uniaxial_neml(self,panel,position):
 		lb = int(self.nbins*(panel-1) + position)
-		print('	File: %s'%self.res)
 		stress_corr = self.unneml(lb)
 		filename = '%s/%s'%(self.folder,self.res)
-		self.plot_stress(filename,stress_corr,lb)
-		tR,time_dmg = self.creepdmg(self.T_o[:,lb],stress_corr)
-		self.tablecsv(filename,stress_corr,tR,time_dmg,lb)
+		# Calculating damage
+		tR,time_dmg,Dc,Df,max_cycles = self.creepdmg(self.T_o[:,lb],stress_corr)
+		print('%s,%d,%d,%.6f,%.6f,%.2f'%(self.res,panel,int(position),np.cumsum(Dc)[-1],np.cumsum(Df)[-1],max_cycles[0]))
+		# Saving data
+		csv = np.c_[self.times,self.T_o[:,lb],self.stress[:,lb],stress_corr,self.epsilon_o[:,lb,:]]
+		headers = ['times','temp_o','stress_eq_o','stress_eq_corr','strain_xx','strain_yy','strain_zz','strain_xy','strain_xz','strain_yz']
+		header = ''
+		for s in headers:
+			header += '%s_neml_%d,'%(s,panel)
+		np.savetxt('neml_panel_%d_position_%s.csv'%(panel,int(position)),csv,delimiter=',',header=header)
 
 	def creepdmg(self,T,stress_corr):
 		period = 24
@@ -787,9 +795,29 @@ class heuristics:
 
 		# Cycle damage
 		Dc = np.array([np.sum(time_dmg[inds[i]:inds[i+1]], axis = 0) for i in range(nt)])
-		print('	Creep damage: %s\n'%np.cumsum(Dc)[-1])
 
-		return tR,time_dmg
+		temperatures = self.T_o
+		strains = self.epsilon_o
+
+		# Run through each cycle and ID max strain range and fatigue damage
+		strain_names = [0, 1, 2, 3, 4, 5] #[ex,ey,ez,exy,exz,eyz]
+		strain_factors = [1.0,1.0,1.0,2.0, 2.0, 2.0]
+
+		Df =  np.array([cycle_fatigue(np.array([ef*strains[inds[i]:inds[i+1],:,en] for en,ef in zip(strain_names, strain_factors)]),
+			temperatures[inds[i]:inds[i+1]], 
+			self.damage_mat) for i in range(nt)])
+
+		### Calculating the number of cycles
+
+		nc = nt
+		max_cycles = []
+
+		for c,f in zip(Dc.reshape(nc,-1).T, Df.reshape(nc,-1).T):
+			max_cycles.append(calculate_max_cycles(make_extrapolate(c), make_extrapolate(f), self.damage_mat))
+
+		max_cycles = np.array(max_cycles)
+
+		return tR,time_dmg,Dc,Df,max_cycles
 
 	def tablecsv(self,filename,stress_corr,tR,time_dmg,lb):
 		e = self.epsilon_o[:,lb,:]
@@ -798,35 +826,6 @@ class heuristics:
 		for t,T,sn,scorr,e1,e2,e3,e4,e5,e6,tr,td in zip(self.times,self.T_o[:,lb],self.stress[:,lb],stress_corr,e[:,0],e[:,1],e[:,2],e[:,3],e[:,4],e[:,5],tR,time_dmg):
 			f.write('%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n'%(t,T,sn,scorr,e1,e2,e3,e4,e5,e6,tr,td))
 		f.close()
-
-	def plot_stress(self,filename,stress_corr,lb):
-		fig,axes = plt.subplots(2,1,figsize=(6,8))
-
-		axes[0].plot(self.times,self.stress[:,lb],label=r'$\sigma^{E}_\mathrm{eq}$')
-		axes[0].plot(self.times,stress_corr      ,label=r'$\sigma_\mathrm{eq,NEML}$')
-		axes[0].set_xlabel(r't (h)')
-		axes[0].set_ylabel(r'$\sigma_\mathrm{eq}$ (MPa)')
-		axes[0].legend(loc='best')
-
-		axes[1].plot(self.times,self.T_o[:,lb]-273.15)
-		axes[1].set_xlabel(r't (h)')
-		axes[1].set_ylabel(r'$T_\mathrm{o}$ (\textdegree C)')
-
-		plt.tight_layout()
-		plt.savefig('%s.png'%(filename),dpi=300)
-
-	def plot_strains(self):
-		fig,axes = plt.subplots(1,1,figsize=(6,4))
-
-		axes.plot(times,data['epsilon_o'][:,lb,0],label=r'$\varepsilon^{E}_\mathrm{rr}$')
-		axes.plot(times,data['epsilon_o'][:,lb,1],label=r'$\varepsilon^{E}_{\theta\theta}$')
-		axes.plot(times,data['epsilon_o'][:,lb,2],label=r'$\varepsilon^{E}_\mathrm{zz}$')
-		axes.set_xlabel(r't (h)')
-		axes.set_ylabel(r'$\varepsilon$ (mm/mm)')
-		axes.legend(loc='best')
-
-		plt.tight_layout()
-		plt.savefig('elastic_strain.png',dpi=300)
 
 	def unneml(self, lb):
 		# Choose the material models
