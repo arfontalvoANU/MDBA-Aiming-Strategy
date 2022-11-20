@@ -962,6 +962,11 @@ class Cyl_receiver():
 
 		T_temp = self.T_in*N.ones(self.nz+1)
 		To_temp = self.T_in*N.ones(self.nz)
+		Tw_int_2D = self.T_in*N.ones(self.nz)
+		Tw_ext_2D = self.T_in*N.ones(self.nz)
+		q_rad_2D = N.zeros(self.nz)
+		q_cnv_2D = N.zeros(self.nz)
+		q_net_2D = N.zeros(self.nz)
 		self.vf_min = 1e10
 		for i in range(self.nz):
 			# Temperature
@@ -1003,9 +1008,29 @@ class Cyl_receiver():
 			Qnet = qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 			T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
 			To_temp[i] = N.amax(To)
+			Tw_ext_2D[i] = To.flatten()[0]
+			Tw_int_2D[i] = Ti.flatten()[0]
 			if Re<1e-3 or T_temp[i+1]>=self.Tmax or N.isnan(T_temp[i+1]):
 				T_temp[i+1] = T_temp[i]
 				To_temp[i] = T_temp[i]
+				Ti_temp[i] = T_temp[i]
+			else:
+				q_rad = self.em*self.sigma*(pow(To,4)-pow(Tamb,4))
+				q_rad = N.concatenate((N.flip(q_rad[:,1:-1],axis=1),q_rad),axis=1)
+				Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
+				q_cnv = h_ext*(To - Tamb)
+				q_cnv = N.concatenate((N.flip(q_cnv[:,1:-1],axis=1),q_cnv),axis=1)
+				Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
+				q_net_2D[i] = Qnet
+				q_rad_2D[i] = Q_rad
+				q_cnv_2D[i] = Q_cnv
+
+		self._Tw_int_2D = Tw_int_2D
+		self._Tw_ext_2D = Tw_ext_2D
+		self._q_net_2D = q_net_2D
+		self._q_rad_2D = q_rad_2D
+		self._q_cnv_2D = q_cnv_2D
+
 		self.T_f = T_temp
 		self.Text= To_temp
 		return abs(T_temp[self.nz]-self.T_out)
@@ -1023,6 +1048,13 @@ class Cyl_receiver():
 		self.q_rad = N.zeros(int(len(self.ahr)))
 		self.q_ref = N.zeros(int(len(self.ahr)))
 		self.q_conv = N.zeros(int(len(self.ahr)))
+
+		self.q_net_2D = N.zeros(int(len(self.ahr)))
+		self.q_rad_2D = N.zeros(int(len(self.ahr)))
+		self.q_cnv_2D = N.zeros(int(len(self.ahr)))
+		self.Tw_int_2D = N.zeros(int(len(self.ahr)))
+		self.Tw_ext_2D = N.zeros(int(len(self.ahr)))
+
 		self.T_w_int = N.zeros(int(len(self.ahr)))
 		self.T_ext = N.ones(int(len(self.ahr)))*self.T_in
 		self.h_conv_int = N.zeros(int(len(self.ahr)))
@@ -1181,6 +1213,8 @@ class Cyl_receiver():
 				self.h_conv_ext = h_conv_ext
 			convergence_tot = N.abs(N.hstack(self.T_ext)-T_ext_old)/N.hstack(self.T_ext)
 
+		self.m_1D = self.m
+		self.V_1D = self.V
 		from .Convection_loss import cyl_conv_loss_coeff_SK
 		self.h_conv_ext = cyl_conv_loss_coeff_SK(self.height, 2.*self.radius, self.D_coating_o/2., self.air_velocity, 0.5*(self.T_in+self.T_out), T_amb)
 		for f in range(int(len(self.fp))):
@@ -1198,18 +1232,75 @@ class Cyl_receiver():
 				q_conv = self.areas_fp[f]*self.h_conv_ext*(self.Text-T_amb)
 				q_net = (self.eff_abs*self.flux_fp[f]*self.areas_fp[f]-q_rad-q_conv)
 				self.q_net[fp] = q_net
-			print(yellow('	m_flow [kg/s]: {0:.6f}	V_min [m/s]: {1:.6f}	V_max [m/s]: {2:.6f}	T_min [C]: {3:.2f}	T_max [C]: {4:.2f}	T_out [C]: {5:.2f}'.format(
-				res, V.min(), V.max(), self.T_f.min()-273.15, self.T_f.max()-273.15, self.T_f[self.nz]-273.15)))
 			self.T_HC[f] = self.T_f
 			self.V[fp] = V
 			self.m[f] = res*self.n_tubes[f]
+
+			self.q_net_2D[fp] = self._q_net_2D
+			self.q_rad_2D[fp] = self._q_rad_2D
+			self.q_cnv_2D[fp] = self._q_cnv_2D
+			self.Tw_int_2D[fp] = self._Tw_int_2D
+			self.Tw_ext_2D[fp] = self._Tw_ext_2D
+
+			s = '	m_flow [kg/s]: %.6f'%(self.m[f]/self.n_tubes[f])
+			s+= '	V_min [m/s]: %.6f'%V.min()
+			s+= '	V_max [m/s]: %.6f'%V.max()
+			s+= '	T_min [C]: [m/s]: %.2f'%(self.T_f.min()-273.15)
+			s+= '	T_max [C]: [m/s]: %.2f'%(self.T_f.max()-273.15)
+			s+= '	T_out [C]: [m/s]: %.2f'%(self.T_f[self.nz]-273.15)
+			print(yellow(s))
 
 		if N.isnan(N.hstack(self.V).any()):
 			print('	Energy balance error')
 		else:
 			print('	Energy balance OK')
 		import pickle
-		data = {'ahr': self.ahr, 'radius':self.radius, 'height':self.height, 'n_banks':self.n_banks, 'n_elems':self.n_elems, 'D_tubes_o':self.D_tubes_o, 'D_tubes_i':self.D_tubes_i, 'eff_abs':self.eff_abs, 'abs_t':self.abs_t, 'eff_ems':self.eff_ems, 'ems_t':self.ems_t, 'k_t':material.k(self.T_w_int), 'ahr_map':self.ahr_map, 'fp':self.fp, 'areas':self.areas, 'areas_fp':self.areas_fp, 'HC':HC, 'T_in':self.T_in, 'T_out':self.T_out, 'h_conv_ext':self.h_conv_ext, 'h':self.h, 'm':self.m, 'flux_in':self.flux_fp, 'q_net':self.q_net, 'q_rad':self.q_rad, 'q_ref':self.q_ref, 'q_conv_ext':self.q_conv, 'T_amb':T_amb, 'T_HC':self.T_HC, 'T_w_int':self.T_w_int, 'T_ext':self.T_ext, 'h_conv_int':self.h_conv_int, 'V': self.V, 'fluxmap':self.fluxmap, 'n_tubes':self.n_tubes, 'Dp':self.Dp, 'pipe_lengths':self.pipe_lengths,'Strt':self.Strt}
+		data = {'ahr': self.ahr
+			,'radius':self.radius
+			,'height':self.height
+			,'n_banks':self.n_banks
+			,'n_elems':self.n_elems
+			,'D_tubes_o':self.D_tubes_o
+			,'D_tubes_i':self.D_tubes_i
+			,'eff_abs':self.eff_abs
+			,'abs_t':self.abs_t
+			,'eff_ems':self.eff_ems
+			,'ems_t':self.ems_t
+			,'k_t':material.k(self.T_w_int)
+			,'ahr_map':self.ahr_map
+			,'fp':self.fp
+			,'areas':self.areas
+			,'areas_fp':self.areas_fp
+			,'HC':HC
+			,'T_in':self.T_in
+			,'T_out':self.T_out
+			,'h_conv_ext':self.h_conv_ext
+			,'h':self.h
+			,'m':self.m
+			,'flux_in':self.flux_fp
+			,'q_net':self.q_net
+			,'q_rad':self.q_rad
+			,'q_ref':self.q_ref
+			,'q_conv_ext':self.q_conv
+			,'T_amb':T_amb
+			,'T_HC':self.T_HC
+			,'T_w_int':self.T_w_int
+			,'T_ext':self.T_ext
+			,'h_conv_int':self.h_conv_int
+			,'V': self.V
+			,'fluxmap':self.fluxmap
+			,'n_tubes':self.n_tubes
+			,'Dp':self.Dp
+			,'pipe_lengths':self.pipe_lengths
+			,'Strt':self.Strt
+			,'q_net_2D':self.q_net_2D
+			,'q_rad_2D':self.q_rad_2D
+			,'q_cnv_2D':self.q_cnv_2D
+			,'Tw_int_2D':self.Tw_int_2D
+			,'Tw_ext_2D':self.Tw_ext_2D
+			,'m_1D':self.m_1D
+			,'V_1D':self.V_1D
+			}
 
 		file_o = open(filesave, 'wb')
 		pickle.dump(data, file_o)

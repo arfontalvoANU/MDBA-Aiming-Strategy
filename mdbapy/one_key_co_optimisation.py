@@ -385,7 +385,7 @@ class one_key_start:
 
 		# initialization for aiming
 		C_aiming=np.zeros(self.num_bundle)
-		C_aiming[:]=0.5
+		C_aiming[:]=0.4
 		Exp=np.zeros(self.num_bundle)
 		Exp[:]=3.0
 		A_f=np.zeros(self.num_bundle)
@@ -439,7 +439,7 @@ class one_key_start:
 		print('	Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool))) # for each flow path
 		print('	vel_max:', np.max(vel_max))
 
-		gap=0.1
+		gap=0.05
 		Defocus=np.all(aiming_results[1])==False
 		title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 
