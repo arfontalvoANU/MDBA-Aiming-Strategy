@@ -920,121 +920,6 @@ class Cyl_receiver():
 		self.Strt=Strt
 		return Strt
 
-	def secant(self, fun,x0,tol=1e-2, maxiter=100, debug=False):
-		x1 = (1.-1e-5)*x0
-		f0 = fun(x0)
-		f1 = fun(x1)
-		i = 0
-		xs = [x0,x1]
-		fs = [f0,f1]
-		alpha = 1
-		while abs(f1) > tol and i < maxiter:
-			x2 = float(f1 - f0)/(x1 - x0)
-			x = x1 - alpha*float(f1)/x2
-
-			if x<0:
-				alpha=alpha/2.
-			elif N.isnan(fun(x)):
-				alpha=alpha/2.
-			else:
-				x0 = x1
-				x1 = x
-				f0 = f1
-				f1 = fun(x1)
-				alpha = 1
-				if self.vf_min > 0.1:
-					xs.append(x1)
-					fs.append(f1)
-
-			if debug:
-				print('	i:{0:g}	m:{1:.6f}	res:{2:e}	Nu min:{3}'.format(i,x1,f1,self.Numin))
-			i += 1
-
-		fmin = min(fs)
-		imin = fs.index(fmin)
-		xmin = xs[imin]
-		return xmin
-
-	def phis(self,x):
-		return N.exp(-1./x)/(N.exp(-1./x) + N.exp(-1./(1-x)))
-
-	def fun(self, m_flow):
-
-		T_temp = self.T_in*N.ones(self.nz+1)
-		To_temp = self.T_in*N.ones(self.nz)
-		Tw_int_2D = self.T_in*N.ones(self.nz)
-		Tw_ext_2D = self.T_in*N.ones(self.nz)
-		q_rad_2D = N.zeros(self.nz)
-		q_cnv_2D = N.zeros(self.nz)
-		q_net_2D = N.zeros(self.nz)
-		self.vf_min = 1e10
-		for i in range(self.nz):
-			# Temperature
-			Tf = T_temp[i]
-			Tamb = self.Tamb
-			h_ext = self.h_conv_ext
-			# Salt props
-			kf = 0.443 + 1.9e-4 * (Tf - 273.15)
-			mu = 0.001 * (22.714 - 0.120 * (Tf - 273.15) + 2.281e-4 * pow(Tf - 273.15, 2.) - 1.474e-7 * pow(Tf - 273.15, 3.))
-			C = 1396.0182 + 0.172 * Tf
-			rho = 2090. - 0.636*(Tf - 273.15)
-			self.vf_min = min(self.vf_min, m_flow/self.area/rho)
-			# Nusselt
-			Re = m_flow * self.d / (self.area * mu)    # HTF Reynolds number
-			Pr = mu * C / kf                           # HTF Prandtl number
-			if Re >= 4e3:
-				f = pow(1.82*N.log10(Re) - 1.64, -2.)
-				Nu = (f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.))
-			elif Re > 2e3 and Re < 4e3:
-				f = 64/Re + self.phis((Re-2e3)/2e3)*(pow(1.82*N.log10(Re) - 1.64, -2.) - 64/Re)
-				Nu = 4.36 + self.phis((Re-2e3)/2e3)*((f/8.)*(Re - 1000.)*Pr/(1. + 12.7*pow(f/8., 0.5)*(pow(Pr, 0.66) -1.)) - 4.36)
-			else:
-				f = 64/Re
-				Nu = 4.36
-			hf = Nu*kf/self.d
-			# Convective heat transfer
-			hf = 1./(1./hf + self.R_fouling)
-			# 2D fun
-			cosinesm,fluxes = N.meshgrid(self.cosines,self.CG[i])
-			qabs = fluxes*cosinesm
-			a = -((self.em*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
-			b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
-			c1 = 9.*a*pow(b,2.) + N.sqrt(3.)*N.sqrt(-256.*pow(a,3.) + 27.*pow(a,2)*pow(b,4))
-			c2 = (4.*pow(2./3.,1./3.))/pow(c1,1./3.) + pow(c1,1./3.)/(pow(2.,1./3.)*pow(3.,2./3.)*a)
-			To = -0.5*N.sqrt(c2) + 0.5*N.sqrt((2.*b)/(a*N.sqrt(c2)) - c2)
-			Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
-			qnet = hf*(Ti - Tf)
-			qnet = N.concatenate((N.flip(qnet[:,1:-1],axis=1),qnet),axis=1)
-			Qnet = qnet.sum(axis=1)*self.Ri*self.dt*self.dz
-			T_temp[i+1] = T_temp[i] + Qnet/C/m_flow
-			To_temp[i] = N.amax(To)
-			Tw_ext_2D[i] = To.flatten()[0]
-			Tw_int_2D[i] = Ti.flatten()[0]
-			if Re<1e-3 or T_temp[i+1]>=self.Tmax or N.isnan(T_temp[i+1]):
-				T_temp[i+1] = T_temp[i]
-				To_temp[i] = T_temp[i]
-				Ti_temp[i] = T_temp[i]
-			else:
-				q_rad = self.em*self.sigma*(pow(To,4)-pow(Tamb,4))
-				q_rad = N.concatenate((N.flip(q_rad[:,1:-1],axis=1),q_rad),axis=1)
-				Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
-				q_cnv = h_ext*(To - Tamb)
-				q_cnv = N.concatenate((N.flip(q_cnv[:,1:-1],axis=1),q_cnv),axis=1)
-				Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
-				q_net_2D[i] = Qnet
-				q_rad_2D[i] = Q_rad
-				q_cnv_2D[i] = Q_cnv
-
-		self._Tw_int_2D = Tw_int_2D
-		self._Tw_ext_2D = Tw_ext_2D
-		self._q_net_2D = q_net_2D
-		self._q_rad_2D = q_rad_2D
-		self._q_cnv_2D = q_cnv_2D
-
-		self.T_f = T_temp
-		self.Text= To_temp
-		return abs(T_temp[self.nz]-self.T_out)
-
 	def balance(self, HC, material, T_in, T_out, T_amb, h_conv_ext, filesave='/home/charles/Documents/Boulot/ASTRI/Sodium receiver_CMI/ref_case_result', load=1., air_velocity=5.):
 
 		self.h = []
@@ -1048,12 +933,6 @@ class Cyl_receiver():
 		self.q_rad = N.zeros(int(len(self.ahr)))
 		self.q_ref = N.zeros(int(len(self.ahr)))
 		self.q_conv = N.zeros(int(len(self.ahr)))
-
-		self.q_net_2D = N.zeros(int(len(self.ahr)))
-		self.q_rad_2D = N.zeros(int(len(self.ahr)))
-		self.q_cnv_2D = N.zeros(int(len(self.ahr)))
-		self.Tw_int_2D = N.zeros(int(len(self.ahr)))
-		self.Tw_ext_2D = N.zeros(int(len(self.ahr)))
 
 		self.T_w_int = N.zeros(int(len(self.ahr)))
 		self.T_ext = N.ones(int(len(self.ahr)))*self.T_in
@@ -1213,41 +1092,8 @@ class Cyl_receiver():
 				self.h_conv_ext = h_conv_ext
 			convergence_tot = N.abs(N.hstack(self.T_ext)-T_ext_old)/N.hstack(self.T_ext)
 
-		self.m_1D = self.m
-		self.V_1D = self.V
-		from .Convection_loss import cyl_conv_loss_coeff_SK
-		self.h_conv_ext = cyl_conv_loss_coeff_SK(self.height, 2.*self.radius, self.D_coating_o/2., self.air_velocity, 0.5*(self.T_in+self.T_out), T_amb)
 		for f in range(int(len(self.fp))):
-			fp = self.fp[f]
-			self.nz = len(fp)
-			self.CG = self.flux_fp[f]
-			m_flow = self.m[f]/self.n_tubes[f]
-			if N.isnan(m_flow):
-				m_flow = self.m[f-1]/self.n_tubes[f-1]
-			res=self.secant(self.fun, m_flow)
-			rss=self.fun(res)
-			V = HC.V_tube(res, 0.5*(self.T_f[:-1]+self.T_f[1:]), self.D_tubes_i)
-			if N.isnan(self.m[f]):
-				q_rad = self.eff_ems*self.areas_fp[f]*5.67e-8*(self.Text**4.-T_amb**4.)
-				q_conv = self.areas_fp[f]*self.h_conv_ext*(self.Text-T_amb)
-				q_net = (self.eff_abs*self.flux_fp[f]*self.areas_fp[f]-q_rad-q_conv)
-				self.q_net[fp] = q_net
-			self.T_HC[f] = self.T_f
-			self.V[fp] = V
-			self.m[f] = res*self.n_tubes[f]
-
-			self.q_net_2D[fp] = self._q_net_2D
-			self.q_rad_2D[fp] = self._q_rad_2D
-			self.q_cnv_2D[fp] = self._q_cnv_2D
-			self.Tw_int_2D[fp] = self._Tw_int_2D
-			self.Tw_ext_2D[fp] = self._Tw_ext_2D
-
 			s = '	m_flow [kg/s]: %.6f'%(self.m[f]/self.n_tubes[f])
-			s+= '	V_min [m/s]: %.6f'%V.min()
-			s+= '	V_max [m/s]: %.6f'%V.max()
-			s+= '	T_min [C]: [m/s]: %.2f'%(self.T_f.min()-273.15)
-			s+= '	T_max [C]: [m/s]: %.2f'%(self.T_f.max()-273.15)
-			s+= '	T_out [C]: [m/s]: %.2f'%(self.T_f[self.nz]-273.15)
 			print(yellow(s))
 
 		if N.isnan(N.hstack(self.V).any()):
@@ -1293,13 +1139,6 @@ class Cyl_receiver():
 			,'Dp':self.Dp
 			,'pipe_lengths':self.pipe_lengths
 			,'Strt':self.Strt
-			,'q_net_2D':self.q_net_2D
-			,'q_rad_2D':self.q_rad_2D
-			,'q_cnv_2D':self.q_cnv_2D
-			,'Tw_int_2D':self.Tw_int_2D
-			,'Tw_ext_2D':self.Tw_ext_2D
-			,'m_1D':self.m_1D
-			,'V_1D':self.V_1D
 			}
 
 		file_o = open(filesave, 'wb')
