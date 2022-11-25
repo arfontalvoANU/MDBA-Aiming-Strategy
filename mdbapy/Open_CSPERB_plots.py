@@ -551,15 +551,15 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 				elif n_banks/len(fp)==2:
 					plt.text(x=bank_lengths[n_elems], y=1500, s='Fp %s'%str(f+1), ha='right',fontsize=size)
 			
-			plt.plot(bank_lengths_2, q_net[fp[f]]/areas[fp[f]]/1e3, label=r'${\dot{q}^{\prime \prime}_\mathrm{abs}}$', color='0.6')
+			plt.plot(bank_lengths_2, flux_in[f]/1e3, label=r'${\dot{q}^{\prime \prime}_\mathrm{inc}}$', color='0.6')
 			flux_lims = flux_limits_V(V[f], T_HC[f], flux_limits_file)/1e3
 			safe_flux_lims = safety_factor*flux_lims
 			plt.plot(bank_lengths, flux_lims, color='r',linewidth=1.,label=r'${\dot{q}^{\prime \prime}_\mathrm{limit}}$')
 			plt.plot(bank_lengths, safe_flux_lims, color='r',linestyle='--',linewidth=1.,label=r'${\dot{q}^{\prime \prime}_\mathrm{safe}}$')
-			Q_net=q_net[fp[f]]/areas[fp[f]]/1e3
+			Q_net=flux_in[f]/1e3
 			if n_banks/len(fp)==2:
 				plt.vlines(x=height,ymin=0,ymax=1500,linestyles='--',linewidth=0.5)
-			D=safety_factor*flux_lims[:-1]-q_net[fp[f]]/areas[fp[f]]/1e3 # difference between flux limits and net flux
+			D=safety_factor*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
 			num_pass=n_banks/len(fp)
 			for i in range(int(num_pass)):
 				Q_net_part=Q_net[n_elems*i:n_elems*(i+1)]
