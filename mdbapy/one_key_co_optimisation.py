@@ -283,7 +283,7 @@ class one_key_start:
 				n_elems=self.bins, 
 				D_tubes_o=60.33/1000., 
 				D_tubes_i=60.33/1000.-2.*1.2e-3, 
-    			abs_t=0.98, 
+				abs_t=0.98, 
 				ems_t=0.91, 
 				k_coating=1.2, 
 				D_coating_o=60.33/1000.+45e-6)
@@ -694,8 +694,8 @@ class one_key_start:
 			n_elems=self.bins, 
 			D_tubes_o=self.D0/1000., 
 			D_tubes_i=self.D0/1000.-2.*1.5e-3, 
-		    abs_t=0.94, 
-			ems_t=0.88, 
+			abs_t=0.93, 
+			ems_t=0.87, 
 			k_coating=1.2, 
 			D_coating_o=self.D0/1000.+45e-6)
 		if self.HTF=='sodium':
