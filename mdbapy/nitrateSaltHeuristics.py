@@ -32,7 +32,7 @@ strMatNormal = lambda a: [''.join(s).rstrip() for s in a]
 strMatTrans  = lambda a: [''.join(s).rstrip() for s in zip(*a)]
 sign = lambda x: math.copysign(1.0, x)
 
-SODIR = os.path.join(os.getenv('HOME'),'solartherm/SolarTherm/Resources/Include/stress')
+SODIR = os.path.join(os.getenv('HOME'),'.local','lib')
 
 def print_table_latex(model, data):
 	print('')
@@ -224,7 +224,8 @@ class receiver_cyl:
 		self.area = 0.25 * np.pi * pow(self.d,2.)    # Tube flow area (m2)
 		self.ln = np.log(Ro/Ri)                      # Log of Ro/Ri simplification
 		#Auxiliary variables
-		cosines = np.cos(np.linspace(0.0, np.pi, nt))
+		theta = np.linspace(0.0, np.pi, self.nt)
+		cosines = np.cos(theta)
 		self.cosines = np.maximum(cosines, np.zeros(nt))
 		self.theta = np.linspace(-np.pi, np.pi,self.nt*2-2)
 		self.n = 3
@@ -252,6 +253,19 @@ class receiver_cyl:
 		for i in pdata:
 			T.append(float(pdata[i]['T']))
 		self.T_max_fatigue = max(T)
+		# view factors
+		zeros = np.where(theta>=0.5*np.pi)
+		alpha = 0.5*np.pi-theta
+		h = np.sqrt(self.Ro**2+4*self.Ro**2-4*self.Ro**2*np.cos(alpha))
+		beta = 0.5*np.pi-np.arcsin(self.Ro*np.sin(alpha)/h)
+		d = np.sqrt(self.Ro**2+h**2-2*self.Ro*h*np.cos(beta))
+		F = (d[0:nt-1]-d[1:]+self.Ro*self.dt)/(2*Ro*self.dt)
+		F = np.append(F,0)
+		F[zeros]=0.0
+		self.eff_em = em*F/(F*(1-em)+em)
+		self.eff_em = np.maximum(self.eff_em,1e-8)
+		self.eff_ab = ab*F/(F*(1-ab)+ab)
+		self.eff_ab = np.maximum(self.eff_ab,1e-8)
 
 	def import_mat(self,fileName):
 		mat = scipy.io.loadmat(fileName, chars_as_strings=False)
@@ -311,6 +325,31 @@ class receiver_cyl:
 		else:
 			k = 124.67 - 0.11381 * T + 5.5226e-5 * pow(T,2) - 1.1842e-8 * pow(T,3);
 		return k;
+
+	def T_h(self,h):
+		"""
+		   Thermal and transport properties of nitrate salt and sodium
+		   Nitrate salt:  Zavoico, A. B. Solar power tower design basis document, revision 0; Topical. Sandia National Labs., 2001.
+		   Liquid sodium: Fink, J. K.; Leibowitz, L. Thermodynamic and transport properties of sodium liquid and vapor. Argonne National Lab., 1995.
+		"""
+		if self.coolant == 'salt':
+			delta = np.abs(pow(1396.0182,2.) + 4*0.086*h)
+			T = (-1396.0182 + np.sqrt(delta)) / (2 * 0.086)
+		else:
+			T = 1000 * (1.6582 - 8.4790e-4 * h + 4.4541e-7 * pow(h,2) - 2992.6 * pow(h,-2))
+		return T
+
+	def enthalpy(self,T):
+		"""
+		   Thermal and transport properties of nitrate salt and sodium
+		   Nitrate salt:  Zavoico, A. B. Solar power tower design basis document, revision 0; Topical. Sandia National Labs., 2001.
+		   Liquid sodium: Fink, J. K.; Leibowitz, L. Thermodynamic and transport properties of sodium liquid and vapor. Argonne National Lab., 1995.
+		"""
+		if self.coolant == 'salt':
+			h = 1396.0182*T + 0.086 * pow(T,2.)
+		else:
+			h = 1000 * (1.6582 - 8.4790e-4 * T + 4.4541e-7 * pow(T,2) - 2992.6 * pow(T,-2))
+		return h
 
 	def specificHeatCapacityCp(self,T):
 		"""
@@ -390,15 +429,19 @@ class receiver_cyl:
 
 		# Calculating heat flux at circumferential nodes
 		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
-		qabs = fluxes*cosinesm 
-		a = -((self.em*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
-		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		qabs = fluxes#*cosinesm
+		self.em_eff,dummy = np.meshgrid(self.eff_em,CG)
+		self.ab_eff,dummy = np.meshgrid(self.eff_ab,CG)
+		a = -((self.em_eff*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab_eff*qabs + self.em_eff*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab_eff*qabs + self.em_eff*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
 		c1 = 9.*a*pow(b,2.) + np.sqrt(3.)*np.sqrt(-256.*pow(a,3.) + 27.*pow(a,2)*pow(b,4))
 		c2 = (4.*pow(2./3.,1./3.))/pow(c1,1./3.) + pow(c1,1./3.)/(pow(2.,1./3.)*pow(3.,2./3.)*a)
 		To = -0.5*np.sqrt(c2) + 0.5*np.sqrt((2.*b)/(a*np.sqrt(c2)) - c2)
 		Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
 		qnet = hf*(Ti - Tf)
-		_qnet = np.concatenate((qnet[:,1:],qnet[:,::-1]),axis=1)
+		inds=np.where(self.cosines==0)[0]
+		qnet[:,inds] = 0.0
+		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
 		Qnet = _qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 		net_zero = np.where(Qnet<0)[0]
 		Qnet[net_zero] = 0.0
