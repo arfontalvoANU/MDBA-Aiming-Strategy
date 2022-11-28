@@ -520,7 +520,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.subplots_adjust(left=0.15, bottom=bot, right=0.95, top = top)
 		Success=[]
 		Positive=[]
-		safety_factor=1.0
+		safety_factor=0.9
 		A_over=N.array([])
 		C_safe=N.array([])
 		C_net=N.array([])
