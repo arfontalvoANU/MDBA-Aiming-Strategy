@@ -693,7 +693,7 @@ class one_key_start:
 			n_banks=self.num_bundle, 
 			n_elems=self.bins, 
 			D_tubes_o=self.D0/1000., 
-			D_tubes_i=self.D0/1000.-2.*1.5e-3, 
+			D_tubes_i=self.D0/1000.-2.*self.WT/1000.,
 			abs_t=0.93, 
 			ems_t=0.87, 
 			k_coating=1.2, 
