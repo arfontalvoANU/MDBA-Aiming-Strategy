@@ -191,6 +191,112 @@ def make_extrapolate(D, extrapolate="lump",order=1):
 	else:
 		raise ValueError("Unknown damage extrapolation approach %s!" % extrapolate)
 
+class Factors:
+	def __init__(self,nodes=2,Ro=45./2000.):
+		self.nt=nodes
+		self.Ro=Ro
+		self.dt=np.pi/(nodes-1)
+		self.theta=np.linspace(0.0,np.pi,nodes)
+	def alphas(self,theta):
+		alpha = np.pi/2.
+		alpha += -np.arcsin(np.cos(theta)/np.sqrt(5.-4*np.sin(theta)))
+		alpha += -np.arcsin(2*np.sqrt(1-np.sin(theta))/np.sqrt(5.-4*np.sin(theta)))
+		return alpha
+	def string(self,thetai,thetaj):
+		ai=self.alphas(thetaj)
+		aj=self.alphas(thetai)
+		ti=thetai
+		tj=thetaj
+		R=self.Ro
+		if ai<=ti:
+			#T1 is not used
+			if aj<=tj:
+				#T2 is not used
+				L=R*np.sqrt(pow(2-np.sin(tj)-np.sin(ti),2) + pow(np.cos(tj)-np.cos(ti),2))
+			else:
+				#T2 is used
+				L =R*np.sqrt(pow(2-np.sin(aj)-np.sin(ti),2) + pow(np.cos(aj)-np.cos(ti),2))
+				L+=R*(aj-tj)
+		else:
+			#T1 is used
+			if aj<=tj:
+				#T2 is not used
+				L =R*(ai-ti)
+				L+=R*np.sqrt(pow(2-np.sin(tj)-np.sin(ai),2) + pow(np.cos(tj)-np.cos(ai),2))
+			else:
+				#T2 is used
+				L =R*(ai-ti)
+				L+=R*np.sqrt(pow(2-np.sin(aj)-np.sin(ai),2) + pow(np.cos(aj)-np.cos(ai),2))
+				L+=R*(aj-tj)
+		return L
+
+	def factor(self,i,j):
+		if self.theta[j]>=np.pi/2. and self.theta[i]<np.pi/2.:
+			ti=max(self.theta[i]-self.dt/2.,0.)
+			ti1=min(self.theta[i]+self.dt/2.,np.pi/2.)
+			tj=max(self.theta[j]-np.pi/2.-self.dt/2.,0.)
+			tj1=min(self.theta[j]-np.pi/2.+self.dt/2.,np.pi/2.)
+			s1=self.string(ti,tj)
+			d1=self.string(ti,tj1)
+			d2=self.string(ti1,tj)
+			s2=self.string(ti1,tj1)
+			num=d1+d2-s1-s2
+			den=2*self.Ro*(ti1-ti)
+			F=num/den
+		elif self.theta[j]<np.pi/2. and self.theta[i]>=np.pi/2.:
+			ti=max(self.theta[i]-np.pi/2.-self.dt/2.,0.)
+			ti1=min(self.theta[i]-np.pi/2.+self.dt/2.,np.pi/2.)
+			tj=max(self.theta[j]-self.dt/2.,0.)
+			tj1=min(self.theta[j]+self.dt/2.,np.pi/2.)
+			s1=self.string(ti,tj)
+			d1=self.string(ti,tj1)
+			d2=self.string(ti1,tj)
+			s2=self.string(ti1,tj1)
+			num=d1+d2-s1-s2
+			den=2*self.Ro*(ti1-ti)
+			F=num/den
+		else:
+			F=0.0
+		return F
+
+	def aperture(self,i,inverse=False):
+		ti=max(self.theta[i]-self.dt/2.,0.)
+		ti1=min(self.theta[i]+self.dt/2.,np.pi/2.)
+		if self.theta[i]>=np.pi/2:
+			ti=max(self.theta[i]-np.pi/2.-self.dt/2.,0.)
+			ti1=min(self.theta[i]-np.pi/2.+self.dt/2.,np.pi/2.)
+		ai=self.alphas(ti)
+		ai1=self.alphas(ti1)
+		s1=self.Ro*ti
+		d1=self.Ro*np.sqrt(pow(2-np.sin(ai)-np.sin(ti),2)+pow(np.cos(ai)-np.cos(ti),2)) + self.Ro*ai
+		d2=self.Ro*ti1
+		s2=self.Ro*np.sqrt(pow(2-np.sin(ai1)-np.sin(ti1),2)+pow(np.cos(ai1)-np.cos(ti1),2)) + self.Ro*ai1
+		num=d1+d2-s1-s2
+		den=2*self.Ro*(ti1-ti)
+		if inverse:
+			F=(ti1-ti)/2*num/den
+		else:
+			F=num/den
+		return F
+
+	def factors(self,debug=False):
+		F=np.zeros((self.nt+1,self.nt+1))
+		for i in range(self.nt+1):
+			if i>0:
+				F[i,0]=self.aperture(i-1)
+		for j in range(self.nt+1):
+			if j>0:
+				F[0,j]=self.aperture(j-1,inverse=True)
+		for i in range(1,self.nt+1):
+			for j in range(1,self.nt+1):
+				if not i==j:
+					F[i,j]=self.factor(i-1,j-1)
+		if debug:
+			csv = np.sum(F,axis=1)
+			F=np.c_[F,csv]
+			np.savetxt("Factors.csv",F,delimiter=",")
+		return F
+
 class receiver_cyl:
 	def __init__(self,coolant = 'salt', Ri = 57.93/2000, Ro = 60.33/2000, T_in = 290, T_out = 565,
                       nz = 450, nt = 46, R_fouling = 0.0, ab = 0.94, em = 0.88, kp = 16.57, H_rec = 10.5, D_rec = 8.5,
@@ -206,8 +312,8 @@ class receiver_cyl:
 		self.nz = nz
 		self.nt = nt
 		self.R_fouling = R_fouling
-		self.ab = ab#/(2./np.pi*(1.-ab)+ab)
-		self.em = em#/(2./np.pi*(1.-em)+em)
+		self.ab = 1
+		self.em = em
 		self.kp = kp
 		self.H_rec = H_rec
 		self.D_rec = D_rec
@@ -225,9 +331,32 @@ class receiver_cyl:
 		self.ln = np.log(Ro/Ri)                      # Log of Ro/Ri simplification
 		#Auxiliary variables
 		self.thetas=np.linspace(0.0,np.pi,self.nt)
-		self.cosines = 1/self.dt*(np.sin(self.thetas+self.dt/2.)-np.sin(self.thetas-self.dt/2.))
-		neg = np.where(self.thetas>=np.pi/2)[0]
-		self.cosines[neg]=0.0
+		# View factors
+		model=Factors(nodes=self.nt,Ro=self.Ro)
+		self.F=model.factors()
+
+		# Vector Ho
+		self.Ho=np.zeros(self.nt+1)
+		for i in range(1,self.nt+1):
+			if self.thetas[i-1]<np.pi/2.:
+				ti=max(self.thetas[i-1]-self.dt/2.,0)
+				tf=min(self.thetas[i-1]+self.dt/2.,np.pi/2)
+			else:
+				ti=max(self.thetas[i-1]-np.pi/2.-self.dt/2.,0)
+				tf=min(self.thetas[i-1]-np.pi/2.+self.dt/2.,np.pi/2)
+			self.Ho[i]=1/(tf-ti)*(np.sin(tf)-np.sin(ti))
+		self.C_ab=self.matrixC(ab)
+		self.C_em=self.matrixC(em)
+		self.A_eb=self.matrixA()
+#		self.cosines=np.zeros_like(self.thetas)
+#		for i in range(self.nt):
+#			if self.thetas[i]<=np.pi/2.:
+#				ti=max(self.thetas[i]-self.dt/2.,0)
+#				tf=min(self.thetas[i]+self.dt/2.,np.pi/2)
+#				self.cosines[i] = 1/(tf-ti)*(np.sin(tf)-np.sin(ti))
+#		neg = np.where(self.thetas>=np.pi/2)[0]
+#		cosines = np.cos(np.linspace(0.0, np.pi, nt))
+#		self.cosines = np.maximum(cosines, np.zeros(nt))
 		self.theta = np.linspace(-np.pi, np.pi,self.nt*2-2)
 		self.n = 3
 		self.l = alpha
@@ -254,138 +383,33 @@ class receiver_cyl:
 		for i in pdata:
 			T.append(float(pdata[i]['T']))
 		self.T_max_fatigue = max(T)
-		# Simplified effective em and ab
-		alpha = 0.5*np.pi-self.thetas
-		h = np.sqrt(self.Ro**2+4*self.Ro**2-4*self.Ro**2*np.cos(alpha))
-		beta = 0.5*np.pi-np.arcsin(self.Ro*np.sin(alpha)/h)
-		d = np.sqrt(self.Ro**2+h**2-2*self.Ro*h*np.cos(beta))
-		F = (d[0:nt-1]-d[1:]+self.Ro*self.dt)/(2*Ro*self.dt)
-		F = np.append(F,0)
-		F[neg]=0.0
-		self.eff_em = em*F/(F*(1-em)+em)
-		self.eff_em = np.maximum(self.eff_em,1e-8)
-		self.eff_ab = ab*F/(F*(1-ab)+ab)
-		self.eff_ab = np.maximum(self.eff_ab,1e-8)
-		# View factors
-		self.F = self.factors()
-		C1=1/self.ab*np.eye(self.nt+1);C1[0,0]=1.0
-		C2=(1/self.ab-1)*self.F;C2[:,0]=0.0
-		C=C1-C2
-		self.Cinv=np.linalg.inv(C)
 
-	def alphas(self,theta):
-		alpha = np.pi/2.
-		alpha += -np.arcsin(np.cos(theta)/np.sqrt(5.-4*np.sin(theta)))
-		alpha += -np.arcsin(2*np.sqrt(1-np.sin(theta))/np.sqrt(5.-4*np.sin(theta)))
-		return alpha
-	def string(self,thetai,thetaj,debug=False):
-		ai=self.alphas(thetaj)
-		aj=self.alphas(thetai)
-		ti=thetai
-		tj=thetaj
-		R=self.Ro
-		if ai<=ti:
-			#T1 is not used
-			if aj<=tj:
-				#T2 is not used
-				L=R*np.sqrt(pow(2-np.sin(tj)-np.sin(ti),2) + pow(np.cos(tj)-np.cos(ti),2))
-			else:
-				#T2 is used
-				L =R*np.sqrt(pow(2-np.sin(aj)-np.sin(ti),2) + pow(np.cos(aj)-np.cos(ti),2))
-				L+=R*(aj-tj)
+	def deltak(self,i,j):
+		if i==j:
+			return 1
 		else:
-			#T1 is used
-			if aj<=tj:
-				#T2 is not used
-				L =R*(ai-ti)
-				L+=R*np.sqrt(pow(2-np.sin(tj)-np.sin(ai),2) + pow(np.cos(tj)-np.cos(ai),2))
-			else:
-				#T2 is used
-				L =R*(ai-ti)
-				L+=R*np.sqrt(pow(2-np.sin(aj)-np.sin(ai),2) + pow(np.cos(aj)-np.cos(ai),2))
-				L+=R*(aj-tj)
-		if debug:
-			print("------------------------")
-			print("    Theta i:  %.6f"%ti)
-			print("    Alpha i:  %.6f"%ai)
-			print("    Theta j:  %.6f"%tj)
-			print("    Alpha i:  %.6f"%aj)
-			print("    Length:   %.6f"%L)
-			print("------------------------")
-		return L
+			return 0
 
-	def factor(self,i,j,debug=False):
-		ti=max(self.thetas[i]-self.dt/2.,0.)
-		ti1=min(self.thetas[i]+self.dt/2.,np.pi/2.)
-		tj=max(self.thetas[j]-self.dt/2.,0.)
-		tj1=min(self.thetas[j]+self.dt/2.,np.pi/2.)
-		s1=self.string(ti,tj,debug=debug)
-		d1=self.string(ti,tj1,debug=debug)
-		d2=self.string(ti1,tj,debug=debug)
-		s2=self.string(ti1,tj1,debug=debug)
-		num=d1+d2-s1-s2
-		den=2*self.Ro*(ti1-ti)
-		if ti>=np.pi/2 or tj>=np.pi/2:
-			F=0.0
-		else:
-			F=num/den
-		if debug:
-			print("------------------------")
-			print("    Sum of sides: %.6f"%(s1+s2))
-			print("    Sum of diags: %.6f"%(d1+d2))
-			print("    Delta theta:  %.6f"%(ti1-ti))
-			print("    View factor:  %.6e"%(F))
-			print("------------------------")
-		return F
+	def matrixC(self,ab):
+		# Matrix C
+		C=np.zeros((self.nt+1,self.nt+1))
+		for i in range(self.nt+1):
+			for j in range(self.nt+1):
+				if j==0:
+					C[i,j]=self.deltak(i,j)
+				else:
+					C[i,j]=self.deltak(i,j)/ab-(1/ab-1)*self.F[i,j]
+		# Inverse
+		Cinv=np.linalg.inv(C)
+		return Cinv
 
-	def aperture(self,i,debug=False,inverse=False):
-		ti=max(self.thetas[i]-self.dt/2.,0.)
-		ti1=min(self.thetas[i]+self.dt/2.,np.pi/2.)
-		ai=self.alphas(ti)
-		ai1=self.alphas(ti1)
-		s1=self.Ro*ti
-		d1=self.Ro*np.sqrt(pow(2-np.sin(ai)-np.sin(ti),2)+pow(np.cos(ai)-np.cos(ti),2)) + self.Ro*ai
-		d2=self.Ro*ti1
-		s2=self.Ro*np.sqrt(pow(2-np.sin(ai1)-np.sin(ti1),2)+pow(np.cos(ai1)-np.cos(ti1),2)) + self.Ro*ai1
-		num=d1+d2-s1-s2
-		den=2*self.Ro*(ti1-ti)
-		if self.thetas[i]>=np.pi/2:
-			F=0.0
-		else:
-			if inverse:
-				F=(ti1-ti)/2*num/den
-			else:
-				F=num/den
-		if debug:
-			print("------------------------")
-			print("    Theta i:  %.6f"%ti)
-			print("    Alpha i:  %.6f"%ai)
-			print("    Theta i1: %.6f"%ti1)
-			print("    Alpha i1: %.6f"%ai1)
-			print("    s1:       %.6f"%s1)
-			print("    d1:       %.6f"%d1)
-			print("    d2:       %.6f"%d2)
-			print("    s1:       %.6f"%s2)
-			print("    Sum of sides: %.6f"%(s1+s2))
-			print("    Sum of diags: %.6f"%(d1+d2))
-			print("    View factor:  %.6f"%(F))
-			print("------------------------")
-		return F
-
-	def factors(self,debug=False):
-		F=np.zeros((self.nt+1,self.nt+1))
-		for i in range(self.nt):
-			for j in range(self.nt):
-				F[i,j]=self.factor(i-1,j-1)
-				if i==0 and j>0:
-					F[i,j]=self.aperture(j-1,inverse=True)
-			if i>0:
-				F[i,0]=self.aperture(i-1)
-		if debug:
-			csv = np.sum(F,axis=1)
-			F=np.c_[F,csv]
-			np.savetxt("Factors.csv",F,delimiter=",")
-		return F
+	def matrixA(self):
+		# Matrix A
+		A=np.zeros((self.nt+1,self.nt+1))
+		for i in range(self.nt+1):
+			for j in range(self.nt+1):
+				A[i,j]=self.deltak(i,j)-self.F[i,j]
+		return A
 
 	def import_mat(self,fileName):
 		mat = scipy.io.loadmat(fileName, chars_as_strings=False)
@@ -548,35 +572,56 @@ class receiver_cyl:
 			hf[Re_pos] = 1./(1./hf[Re_pos] + self.R_fouling)
 
 		# Calculating heat flux at circumferential nodes
+#		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
+#		qabs = fluxes*cosinesm 
+		self.cosines = np.dot(self.C_ab,self.Ho)[1:]
 		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
-		qabs = fluxes#*cosinesm
-		self.em_eff,dummy = np.meshgrid(self.eff_em,CG)
-		self.ab_eff,dummy = np.meshgrid(self.eff_ab,CG)
-		a = -((self.em_eff*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab_eff*qabs + self.em_eff*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
-		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab_eff*qabs + self.em_eff*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		qabs = fluxes*cosinesm
+		a = -((self.em*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
 		c1 = 9.*a*pow(b,2.) + np.sqrt(3.)*np.sqrt(-256.*pow(a,3.) + 27.*pow(a,2)*pow(b,4))
 		c2 = (4.*pow(2./3.,1./3.))/pow(c1,1./3.) + pow(c1,1./3.)/(pow(2.,1./3.)*pow(3.,2./3.)*a)
 		To = -0.5*np.sqrt(c2) + 0.5*np.sqrt((2.*b)/(a*np.sqrt(c2)) - c2)
 		Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
 		qnet = hf*(Ti - Tf)
-		inds=np.where(self.cosines==0)[0]
-		qnet[:,inds] = 0.0
-		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
+		_qnet = qnet
+#		inds=np.where(self.cosines==0)[0]
+#		qnet[:,inds] = 0.0
+#		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
 		Qnet = _qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 		net_zero = np.where(Qnet<0)[0]
 		Qnet[net_zero] = 0.0
 		_qnet[net_zero,:] = 0.0
 		self.qnet = _qnet
 
-		q_abs = self.ab*qabs
-		q_abs = np.concatenate((np.flip(q_abs[:,1:-1],axis=1),q_abs),axis=1)
-		self.Q_abs = q_abs.sum(axis=1)*self.Ro*self.dt*self.dz
-		q_rad = self.em*self.sigma*(pow(To,4)-pow(Tamb,4))
-		q_rad = np.concatenate((np.flip(q_rad[:,1:-1],axis=1),q_rad),axis=1)
+		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
+
+		for iter in range(4):
+			To_prev = To
+			Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
+			q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
+			q_rad=np.transpose(q_rad)
+			self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
+
+			q_cnv = h_ext*(To - Tamb)
+			self.Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
+
+	#		q_rad = self.em*self.sigma*(pow(To,4)-pow(Tamb,4))
+	#		self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
+
+			Ti = Tf + (qabs - q_rad - q_cnv)*self.Ro/self.Ri/hf
+			To = Ti*(1 + hf*self.Ri*self.ln/self.kp) - hf*self.Ri*self.ln/self.kp*Tf
+			res=np.amax(np.abs(To-To_prev)/To)
+
+		Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
+		q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
+		q_rad=np.transpose(q_rad)
 		self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
+
 		q_cnv = h_ext*(To - Tamb)
-		q_cnv = np.concatenate((np.flip(q_cnv[:,1:-1],axis=1),q_cnv),axis=1)
 		self.Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
+
+		Qnet = self.Q_abs - self.Q_rad - self.Q_cnv
 
 		for t in range(Ti.shape[0]):
 			BDp = self.Fourier(Ti[t,:])
