@@ -348,15 +348,6 @@ class receiver_cyl:
 		self.C_ab=self.matrixC(ab)
 		self.C_em=self.matrixC(em)
 		self.A_eb=self.matrixA()
-#		self.cosines=np.zeros_like(self.thetas)
-#		for i in range(self.nt):
-#			if self.thetas[i]<=np.pi/2.:
-#				ti=max(self.thetas[i]-self.dt/2.,0)
-#				tf=min(self.thetas[i]+self.dt/2.,np.pi/2)
-#				self.cosines[i] = 1/(tf-ti)*(np.sin(tf)-np.sin(ti))
-#		neg = np.where(self.thetas>=np.pi/2)[0]
-#		cosines = np.cos(np.linspace(0.0, np.pi, nt))
-#		self.cosines = np.maximum(cosines, np.zeros(nt))
 		self.theta = np.linspace(-np.pi, np.pi,self.nt*2-2)
 		self.n = 3
 		self.l = alpha
@@ -572,8 +563,6 @@ class receiver_cyl:
 			hf[Re_pos] = 1./(1./hf[Re_pos] + self.R_fouling)
 
 		# Calculating heat flux at circumferential nodes
-#		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
-#		qabs = fluxes*cosinesm 
 		self.cosines = np.dot(self.C_ab,self.Ho)[1:]
 		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
 		qabs = fluxes*cosinesm
@@ -585,9 +574,6 @@ class receiver_cyl:
 		Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
 		qnet = hf*(Ti - Tf)
 		_qnet = qnet
-#		inds=np.where(self.cosines==0)[0]
-#		qnet[:,inds] = 0.0
-#		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
 		Qnet = _qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 		net_zero = np.where(Qnet<0)[0]
 		Qnet[net_zero] = 0.0
@@ -595,31 +581,22 @@ class receiver_cyl:
 		self.qnet = _qnet
 
 		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
+		convergence = np.ones_like(To)
 
-		for iter in range(4):
-			To_prev = To
+		while (convergence>1e-4).any():
+			# Radiation model
 			Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
 			q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
 			q_rad=np.transpose(q_rad)
 			self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
-
+			# Convection losses
 			q_cnv = h_ext*(To - Tamb)
 			self.Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
-
-	#		q_rad = self.em*self.sigma*(pow(To,4)-pow(Tamb,4))
-	#		self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
-
+			# Temperature update
 			Ti = Tf + (qabs - q_rad - q_cnv)*self.Ro/self.Ri/hf
-			To = Ti*(1 + hf*self.Ri*self.ln/self.kp) - hf*self.Ri*self.ln/self.kp*Tf
-			res=np.amax(np.abs(To-To_prev)/To)
-
-		Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
-		q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
-		q_rad=np.transpose(q_rad)
-		self.Q_rad = q_rad.sum(axis=1)*self.Ro*self.dt*self.dz
-
-		q_cnv = h_ext*(To - Tamb)
-		self.Q_cnv = q_cnv.sum(axis=1)*self.Ro*self.dt*self.dz
+			To_new = Ti*(1 + hf*self.Ri*self.ln/self.kp) - hf*self.Ri*self.ln/self.kp*Tf
+			convergence=np.abs(To-To_new)/To
+			To = np.copy(To_new)
 
 		Qnet = self.Q_abs - self.Q_rad - self.Q_cnv
 
