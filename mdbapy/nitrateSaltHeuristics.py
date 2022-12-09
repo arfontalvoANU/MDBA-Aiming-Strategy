@@ -302,7 +302,7 @@ class receiver_cyl:
                       nz = 450, nt = 46, R_fouling = 0.0, ab = 0.94, em = 0.88, kp = 16.57, H_rec = 10.5, D_rec = 8.5,
                       nbins = 50, alpha = 15.6e-6, Young = 186e9, poisson = 0.31,
                       thermat = "base",defomat = "const_base",damat = "base",mat='800H',
-                      debugfolder = os.path.expanduser('~'), debug = False, verification = False, Dittus=True):
+                      debugfolder = os.path.expanduser('~'), debug = False, verification = False, Dittus=True,maxiter=100):
 		self.coolant = coolant
 		self.Ri = Ri
 		self.Ro = Ro
@@ -312,7 +312,7 @@ class receiver_cyl:
 		self.nz = nz
 		self.nt = nt
 		self.R_fouling = R_fouling
-		self.ab = 1
+		self.ab = ab
 		self.em = em
 		self.kp = kp
 		self.H_rec = H_rec
@@ -334,6 +334,7 @@ class receiver_cyl:
 		# View factors
 		model=Factors(nodes=self.nt,Ro=self.Ro)
 		self.F=model.factors()
+		self.maxiter=maxiter
 
 		# Vector Ho
 		self.Ho=np.zeros(self.nt+1)
@@ -566,8 +567,8 @@ class receiver_cyl:
 		self.cosines = np.dot(self.C_ab,self.Ho)[1:]
 		cosinesm,fluxes = np.meshgrid(self.cosines,CG)
 		qabs = fluxes*cosinesm
-		a = -((self.em*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
-		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(self.ab*qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		a = -((self.em*(self.kp + hf*self.ln*self.Ri)*self.Ro*self.sigma)/((self.kp + hf*self.ln*self.Ri)*self.Ro*(qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
+		b = -((hf*self.kp*self.Ri + (self.kp + hf*self.ln*self.Ri)*self.Ro*(h_ext))/((self.kp + hf*self.ln*self.Ri)*self.Ro*(qabs + self.em*self.sigma*pow(Tamb,4)) + hf*self.kp*self.Ri*Tf + (self.kp + hf*self.ln*self.Ri)*self.Ro*Tamb*(h_ext)))
 		c1 = 9.*a*pow(b,2.) + np.sqrt(3.)*np.sqrt(-256.*pow(a,3.) + 27.*pow(a,2)*pow(b,4))
 		c2 = (4.*pow(2./3.,1./3.))/pow(c1,1./3.) + pow(c1,1./3.)/(pow(2.,1./3.)*pow(3.,2./3.)*a)
 		To = -0.5*np.sqrt(c2) + 0.5*np.sqrt((2.*b)/(a*np.sqrt(c2)) - c2)
@@ -582,8 +583,8 @@ class receiver_cyl:
 
 		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
 		convergence = np.ones_like(To)
-
-		while (convergence>1e-4).any():
+		it=0
+		while (convergence>1e-4).any() and it<self.maxiter:
 			# Radiation model
 			Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
 			q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
@@ -597,6 +598,7 @@ class receiver_cyl:
 			To_new = Ti*(1 + hf*self.Ri*self.ln/self.kp) - hf*self.Ri*self.ln/self.kp*Tf
 			convergence=np.abs(To-To_new)/To
 			To = np.copy(To_new)
+			it+=1
 
 		Qnet = self.Q_abs - self.Q_rad - self.Q_cnv
 
