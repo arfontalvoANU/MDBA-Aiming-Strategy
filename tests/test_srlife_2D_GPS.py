@@ -277,6 +277,7 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 	Tf[ramp_up,:] = 533.15*np.ones_like(Tf[ramp_up,:])
 	qnet = np.zeros((times.shape[0],2*model.nt-2,model.nz))
 	pressure = 0.1*np.ones_like(times)
+	quarter=np.where(model.thetas>np.pi/2)[0]
 
 	# Running thermal model
 	print(yellow('	Running thermal model'))
