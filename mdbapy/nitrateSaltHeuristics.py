@@ -584,7 +584,7 @@ class receiver_cyl:
 		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
 		convergence = np.ones_like(To)
 		it=0
-		while (convergence>1e-4).any() and it<self.maxiter:
+		while (convergence>1e-4).any():
 			# Radiation model
 			Eb = self.sigma*pow(np.c_[Tamb[:,0],To],4)
 			q_rad=np.dot(self.C_em,np.dot(self.A_eb,np.transpose(Eb)))[1:]
@@ -599,6 +599,8 @@ class receiver_cyl:
 			convergence=np.abs(To-To_new)/To
 			To = np.copy(To_new)
 			it+=1
+			if it>self.maxiter:
+				raise(RuntimeError("The external temperature did not converge"))
 
 		Qnet = self.Q_abs - self.Q_rad - self.Q_cnv
 
