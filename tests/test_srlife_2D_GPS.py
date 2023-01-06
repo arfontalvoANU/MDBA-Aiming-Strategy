@@ -62,11 +62,11 @@ def setup_problem(Ro, th, H_rec, Nr, Nt, Nz, times, fluid_temp, h_flux, pressure
 		fileName = 'model.hdf5'
 	else:
 		fileName = '%s/model.hdf5'%folder
-	model.save('model.hdf5')
+	model.save(fileName)
 
 def run_problem(zpos,nz,progress_bar=True,folder=None,nthreads=4,load_state0=False,savestate=False,savefolder='.',loadfolder='.',debug=False):
 	# Load the receiver we previously saved
-	model = receiver.Receiver.load('model.hdf5')
+	model = receiver.Receiver.load('%s/model.hdf5'%savefolder)
 
 	# Choose the material models
 	fluid_mat = library.load_fluid("nitratesalt", "base")
@@ -127,10 +127,9 @@ def run_problem(zpos,nz,progress_bar=True,folder=None,nthreads=4,load_state0=Fal
 	# Actually solve for life
 	solver.solve_heat_transfer()#
 	solver.solve_structural()
-#	mydict = {}
-#	for tube in solver.tubes:
-#		mydict["temperature"] = tube.results["temperature"]
-#	scipy.io.savemat(os.path.join(savefolder,"quadrature_results.mat"),mydict)
+	for pi, panel in model.panels.items():
+		for ti, tube in panel.tubes.items():
+			scipy.io.savemat('%s/quadrature_results.mat'%savefolder,tube.quadrature_results)
 	result = 1
 	return result
 
@@ -320,6 +319,7 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 	              qnet[:,:,lb:ub],
 	              pressure,
 	              T_base = 293.15,
+	              folder=savefolder,
 	              days=ndays)
 
 	# Running srlife
@@ -335,20 +335,22 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 		          savefolder=savefolder,
 		          debug=debug)
 
-	scipy.io.savemat('%s/inputs.mat'%savefolder,{
-	              'times':times,
-	              'qnet':qnet,
-	              'Tf':Tf,
-	              'pressure':pressure})
-
 	# Plotting thermal results
 	fig, axes = plt.subplots(2,3, figsize=(18,8))
 
-	axes[0,0].plot(times, Tf[:,lb:ub])
+	model = receiver.Receiver.load('%s/model.hdf5'%savefolder)
+	panel=model.panels['panel0']
+	tube=panel.tubes['tube0']
+	times = tube.times
+	qnet = tube.outer_bc.data
+	Tf = tube.inner_bc.data
+	pressure = tube.pressure_bc.data
+
+	axes[0,0].plot(times, Tf)
 	axes[0,0].set_ylabel(r'$T_\mathrm{f}$ [K]')
 	axes[0,0].set_xlabel(r'$t$ [h]')
 
-	axes[0,1].plot(times, qnet[:,0,lb:ub])
+	axes[0,1].plot(times, qnet[:,0,:])
 	axes[0,1].set_ylabel(r'$q^{\prime\prime}_\mathrm{net}$ [MW/m$^2$]')
 	axes[0,1].set_xlabel(r'$t$ [h]')
 
@@ -406,7 +408,7 @@ if __name__=='__main__':
 	parser.add_argument('--clearSky', type=bool, default=False, help='Run clear sky DNI (requires to have the solartherm results)')
 	parser.add_argument('--load_state0', type=int, default=0, help='Load state from a previous simulation')
 	parser.add_argument('--savestate', type=bool, default=True, help='Save the last state of the last simulated day')
-	parser.add_argument('--step', type=float, default=900, help='Simulation step. Default=900')
+	parser.add_argument('--step', type=float, default=600, help='Simulation step. Default=900')
 	parser.add_argument('--debug', type=bool, default=False, help='Debug option. Default=False')
 	parser.add_argument('--rfile', type=str, default='/home/arfontalvo/solartherm/examples/SimpleSystemOperation_res_1m_new.mat')
 	args = parser.parse_args()
@@ -419,12 +421,8 @@ if __name__=='__main__':
 		try:
 			run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,args.step,args.debug,rfile = args.rfile)
 		except RuntimeError:
-			try:
-				time_step = 600.0
-				run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
-			except RuntimeError:
-				time_step = 60.0
-				run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
+			time_step = 60.0
+			run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
 	seconds = time.time() - tinit
 	m, s = divmod(seconds, 60)
 	h, m = divmod(m, 60)
