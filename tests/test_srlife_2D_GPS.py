@@ -124,6 +124,9 @@ def run_problem(zpos,nz,progress_bar=True,folder=None,nthreads=4,load_state0=Fal
 		structural_solver, deformation_mat, damage_mat,
 		system_solver, damage_model, pset = params)
 
+	# Heuristics
+	solver.add_heuristic(managers.CycleResetHeuristic())
+
 	# Actually solve for life
 	solver.solve_heat_transfer()#
 	solver.solve_structural()
@@ -234,7 +237,7 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 	step_ramp=min(60.,step)
 	for i in tqdm(range(len(times))):
 		if con_state[i]==1:
-			if times[i]%7200.==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
+			if times[i]%3600.==0 and times[i] not in _times and time_lb<=times[i] and times[i]<=time_ub:
 				index.append(i)
 				_times.append(times[i])
 		elif con_state[i]==2 and con_state[i-1]==1:
