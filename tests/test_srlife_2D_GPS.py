@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import os, sys, math, scipy.io, argparse
 import gc
 from tqdm import tqdm
+import sendmail
 
 sys.path.append('../..')
 
@@ -129,11 +130,20 @@ def run_problem(zpos,nz,progress_bar=True,folder=None,nthreads=4,load_state0=Fal
 
 	# Actually solve for life
 	solver.solve_heat_transfer()#
-	solver.solve_structural()
+	try:
+		solver.solve_structural()
+	except RuntimeError:
+		del model,solver
+		gc.collect()
+		sendmail.notification_fail()
+		raise RuntimeError("solver.solve_structural() failed")
+
+	result = 1
+
+	# Save the tube data out for additional visualization
 	for pi, panel in model.panels.items():
 		for ti, tube in panel.tubes.items():
 			scipy.io.savemat('%s/quadrature_results.mat'%savefolder,tube.quadrature_results)
-	result = 1
 	return result
 
 
@@ -402,6 +412,18 @@ def run_gemasolar(panel,position,days,nthreads,clearSky,load_state0,savestate,st
 	plt.savefig('%s/results_%s_d%s'%(savefolder,case,days[1]))
 	plt.close(fig)
 
+	# Verification of residual stress
+	nt=vm.shape[0]
+	if (vm[nt-1,-1,0]/vm[0,-1,0])<0.95 or (vm[nt-1,-1,0]/vm[0,-1,0])>1.05:
+		sendmail.warning(days)
+		raise RuntimeError("Big jump in outer residual stress")
+
+	if vm[nt-1,-1,0]<vm[0,0,0]:
+		sendmail.warning(days)
+		raise RuntimeError("Inner residual stress is greater than outer residual stress")
+	del model,panel,tube,times,qnet,Tf,pressure,quadrature_results
+	gc.collect()
+
 if __name__=='__main__':
 	parser = argparse.ArgumentParser(description='Estimates average damage of a representative tube in a receiver panel')
 	parser.add_argument('--panel', type=int, default=7, help='Panel to be simulated. Default=1')
@@ -424,8 +446,13 @@ if __name__=='__main__':
 		try:
 			run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,args.step,args.debug,rfile = args.rfile)
 		except RuntimeError:
-			time_step = 60.0
-			run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
+			try:
+				time_step = 300.0
+				run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
+			except RuntimeError:
+				time_step = 60.0
+				run_gemasolar(args.panel,args.position,args.days,args.nthreads,args.clearSky,args.load_state0,args.savestate,time_step,args.debug,rfile = args.rfile)
+	sendmail.notification(args.panel)
 	seconds = time.time() - tinit
 	m, s = divmod(seconds, 60)
 	h, m = divmod(m, 60)
