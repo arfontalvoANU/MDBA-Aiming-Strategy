@@ -520,7 +520,15 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.subplots_adjust(left=0.15, bottom=bot, right=0.95, top = top)
 		Success=[]
 		Positive=[]
-		safety_factor=0.9
+		vsf=[1.,1.,1.,0.95,0.85,0.8,0.8,0.8,0.8]
+		safety_factor=vsf[0]*N.ones(51)
+		for v in vsf[1:]:
+			safety_factor=N.append(safety_factor,v*N.ones(50))
+#		vsf=[1.,1.,1.,1.,0.9,0.8,0.8,0.8,0.8,0.8]
+#		safety_factor=N.linspace(vsf[0],vsf[1],51)
+#		for v,w in zip(vsf[1:9],vsf[2:]):
+#			dummyvec=N.linspace(v,w,50)
+#			safety_factor=N.append(safety_factor,dummyvec)
 		A_over=N.array([])
 		C_safe=N.array([])
 		C_net=N.array([])
@@ -559,7 +567,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 			Q_net=flux_in[f]/1e3
 			if n_banks/len(fp)==2:
 				plt.vlines(x=height,ymin=0,ymax=1500,linestyles='--',linewidth=0.5)
-			D=safety_factor*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
+			D=safety_factor[:-1]*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
 			num_pass=n_banks/len(fp)
 			for i in range(int(num_pass)):
 				Q_net_part=Q_net[n_elems*i:n_elems*(i+1)]
