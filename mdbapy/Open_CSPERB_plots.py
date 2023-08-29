@@ -30,7 +30,7 @@ def flux_limits_V(V, Ts, flux_limits_file):
 	flux_lim = fit(V, Ts)
 	return flux_lim[:,0]
 	
-def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None,overflux=True):
+def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None,overflux=True,sf_vector=[1.,1.,1.,1.,1.,1.,1.,1.,1.]):
 	print("tower receiver plotting")
 	fileo = open(files,'rb')
 	data = pickle.load(fileo)
@@ -520,7 +520,10 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.subplots_adjust(left=0.15, bottom=bot, right=0.95, top = top)
 		Success=[]
 		Positive=[]
-		safety_factor=0.9
+		vsf=sf_vector
+		safety_factor=vsf[0]*N.ones(51)
+		for v in vsf[1:]:
+			safety_factor=N.append(safety_factor,v*N.ones(50))
 		A_over=N.array([])
 		C_safe=N.array([])
 		C_net=N.array([])
@@ -559,7 +562,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 			Q_net=flux_in[f]/1e3
 			if n_banks/len(fp)==2:
 				plt.vlines(x=height,ymin=0,ymax=1500,linestyles='--',linewidth=0.5)
-			D=safety_factor*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
+			D=safety_factor[:-1]*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
 			num_pass=n_banks/len(fp)
 			for i in range(int(num_pass)):
 				Q_net_part=Q_net[n_elems*i:n_elems*(i+1)]
