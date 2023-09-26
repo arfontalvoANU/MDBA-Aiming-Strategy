@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd /media/arfontalvo/armando/mdba_aiming/tests/TEST-DEFOCUS-SALT
+python3 /media/arfontalvo/armando/mdba_jobs/runGemasolar.py --dnir 1.0 --case 0

@@ -33,7 +33,7 @@ def yellow(text):
 	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
 class one_key_start:
-	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85):
+	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85,sf_vector=[1.,1.,1.,1.,1.,1.,1.,1.,1.]):
 		"""
 		casedir (str): case directory
 		tower_h (float): tower height (m)
@@ -60,7 +60,7 @@ class one_key_start:
 
 		"""
 
-	
+		self.sf_vector=sf_vector
 		self.casedir=casedir
 		self.fluxlimitpath=fluxlimitpath
 		if not os.path.exists(casedir):
@@ -442,13 +442,15 @@ class one_key_start:
 		gap=0.05
 		Defocus=np.all(aiming_results[1])==False
 		title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
+		C_aiming_old=np.ones(self.num_bundle)
+		C_aiming_old[:]=C_aiming[:]
 
 		# search algorithm
 		ite1=0
 		pos_and_aiming_stand_by=np.array([])
-		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False) and ite1<100): #and np.all(C_aiming<1.):
-			print('		Iteration', ite1)	
-
+		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False or q_results[-1]>self.Q_rec) and ite1<100): #and np.all(C_aiming<1.):
+			print('		Iteration', ite1)
+			print('		Qabs bool',q_results[-1],self.Q_rec)
 			if np.all(C_aiming<1.)==False:
 				# instead of extent E, defocus high-foc heliostats
 				Tude_index=np.full(self.num_bundle, True, dtype=bool)
@@ -468,6 +470,17 @@ class one_key_start:
 					else:
 						pos_and_aiming_new=np.append(pos_and_aiming_new, Hst_info[i])
 					#print (i,len(Hst_info[i]),len(pos_and_aiming_new)/7,len(pos_and_aiming_stand_by)/7)
+				pos_and_aiming_new=np.append(title,pos_and_aiming_new)
+				pos_and_aiming_new=pos_and_aiming_new.reshape(int(len(pos_and_aiming_new)/7), 7)
+				np.savetxt('%s/pos_and_aiming_new.csv' % self.casedir, pos_and_aiming_new, fmt='%s', delimiter=',')	
+				print('		length: %s'%str(len(pos_and_aiming_new)-2))
+			elif q_results[-1]>self.Q_rec:
+				# instead of extent E, defocus high-foc heliostats
+				pos_and_aiming_new=np.array([])
+				for i in range(self.num_bundle):
+					foc=Hst_info[i][:,3]
+					pos_and_aiming_new=np.append(pos_and_aiming_new, Hst_info[i][np.argsort(foc)[::1]][:int(0.95*len(Hst_info[i]))])
+					pos_and_aiming_stand_by=np.append(pos_and_aiming_stand_by, Hst_info[i][np.argsort(foc)[::1]][int(0.95*len(Hst_info[i])):])
 				pos_and_aiming_new=np.append(title,pos_and_aiming_new)
 				pos_and_aiming_new=pos_and_aiming_new.reshape(int(len(pos_and_aiming_new)/7), 7)
 				np.savetxt('%s/pos_and_aiming_new.csv' % self.casedir, pos_and_aiming_new, fmt='%s', delimiter=',')	
@@ -720,7 +733,8 @@ class one_key_start:
 			saveloc=None, 
 			billboard=False, 
 			flux_limits_file=self.flux_limits_file,
-			C_aiming=self.C_aiming,overflux=overflux)
+			C_aiming=self.C_aiming,overflux=overflux,
+			sf_vector=self.sf_vector)
 		
 		vel_max_2=np.ones(self.num_bundle) # no considered velocity limit for salt receiver
 		if self.HTF=='sodium':
