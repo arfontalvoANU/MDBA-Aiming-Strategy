@@ -33,7 +33,7 @@ def yellow(text):
 	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
 class one_key_start:
-	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85):
+	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85,sf_vector=[1.,1.,1.,1.,1.,1.,1.,1.,1.]):
 		"""
 		casedir (str): case directory
 		tower_h (float): tower height (m)
@@ -60,7 +60,7 @@ class one_key_start:
 
 		"""
 
-	
+		self.sf_vector=sf_vector
 		self.casedir=casedir
 		self.fluxlimitpath=fluxlimitpath
 		if not os.path.exists(casedir):
@@ -720,7 +720,8 @@ class one_key_start:
 			saveloc=None, 
 			billboard=False, 
 			flux_limits_file=self.flux_limits_file,
-			C_aiming=self.C_aiming,overflux=overflux)
+			C_aiming=self.C_aiming,overflux=overflux,
+			sf_vector=self.sf_vector)
 		
 		vel_max_2=np.ones(self.num_bundle) # no considered velocity limit for salt receiver
 		if self.HTF=='sodium':

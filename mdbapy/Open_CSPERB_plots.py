@@ -30,7 +30,7 @@ def flux_limits_V(V, Ts, flux_limits_file):
 	flux_lim = fit(V, Ts)
 	return flux_lim[:,0]
 	
-def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None,overflux=True):
+def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None,overflux=True,sf_vector=[1.,1.,1.,0.97,0.85,0.85,0.81,0.81,0.78]):
 	print("tower receiver plotting")
 	fileo = open(files,'rb')
 	data = pickle.load(fileo)
@@ -520,7 +520,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.subplots_adjust(left=0.15, bottom=bot, right=0.95, top = top)
 		Success=[]
 		Positive=[]
-		vsf=[1.,1.,1.,0.95,0.85,0.8,0.8,0.8,0.8]
+		vsf=sf_vector
 		safety_factor=vsf[0]*N.ones(51)
 		for v in vsf[1:]:
 			safety_factor=N.append(safety_factor,v*N.ones(50))
