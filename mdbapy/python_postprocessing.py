@@ -20,30 +20,30 @@ def proces_raw_results(rawfile, savedir):
     elevation=sun[1]
 
     # Global results
-    line=map(float, content[1].split(' '))
+    line=list(map(float, content[1].split(' ')))
     num_hst=line[2]
     num_rays=line[3]
 
-    potential=map(float, content[2].split(' '))[0] #W
-    potential_err=map(float, content[2].split(' '))[1]
+    potential=list(map(float, content[2].split(' ')))[0]#W
+    potential_err=list(map(float, content[2].split(' ')))[1]
 
-    absorbed=map(float, content[3].split(' '))[0]
-    absorbed_err=map(float, content[3].split(' '))[1]    
+    absorbed=list(map(float, content[3].split(' ')))[0]
+    absorbed_err=list(map(float, content[3].split(' ')))[1]    
 
-    Fcos=map(float, content[4].split(' '))[0]
-    Fcos_err=map(float, content[4].split(' '))[1]  
+    Fcos=list(map(float, content[4].split(' ')))[0]
+    Fcos_err=list(map(float, content[4].split(' ')))[1] 
 
-    shadow_loss=map(float, content[5].split(' '))[0]
-    shadow_err=map(float, content[5].split(' '))[1]    
+    shadow_loss=list(map(float, content[5].split(' ')))[0]
+    shadow_err=list(map(float, content[5].split(' ')))[1]  
   
-    missing_loss=map(float, content[6].split(' '))[0]
-    missing_err=map(float, content[6].split(' '))[1] 
+    missing_loss=list(map(float, content[6].split(' ')))[0]
+    missing_err=list(map(float, content[6].split(' ')))[1] 
 
-    material_loss=map(float, content[7].split(' '))[0]
-    material_err=map(float, content[7].split(' '))[1]    
+    material_loss=list(map(float, content[7].split(' ')))[0]
+    material_err=list(map(float, content[7].split(' ')))[1]   
    
-    atmospheric_loss=map(float, content[8].split(' '))[0]
-    atmospheric_err=map(float, content[8].split(' '))[1]  
+    atmospheric_loss=list(map(float, content[8].split(' ')))[0]
+    atmospheric_err=list(map(float, content[8].split(' ')))[1]  
 
 
     # Target (receiver)
@@ -62,7 +62,7 @@ def proces_raw_results(rawfile, savedir):
     virtual=content[10].split()
     vir_area=float(virtual[2])
     vir_income=float(virtual[25]) # back face available
-    #print vir_income
+    #print(vir_income)
     vir_income_err=float(virtual[4])
     
     Qtotal=potential
@@ -76,10 +76,10 @@ def proces_raw_results(rawfile, savedir):
     Qblock=Qtotal-Qcos-Qshade-Qfield_abs-Qspil-Qabs-Qrefl-Q_att
     
     Q=N.array([Qtotal,Qcos,Qshade,Qfield_abs,Qblock,Q_att,Qspil,Qrefl,Qabs])
-    #print Q
+    #print(Q)
     efficiency_total=Qabs/Qtotal
     efficiency_exclu_inter=(Qabs+Qspil)/Qtotal
-   # print 'Interception: '+str(Qabs/(Qspil+Qabs))
+   # print('Interception: '+str(Qabs/(Qspil+Qabs))
     return efficiency_total,Q,efficiency_exclu_inter
 
 def get_heliostat_to_receiver_data(simul, DNI, receiver_name):
@@ -121,7 +121,7 @@ def get_heliostat_to_receiver_data(simul, DNI, receiver_name):
 	rXpidxs = pidxs[1], pidxs[1]+counts[1]*counts[2]
 	rXp = N.array([' '.join(x.split(' ')).split() for x in data[rXpidxs[0]:rXpidxs[1]]], dtype=float)
 	r_mask = rXp[:,0]==recID
-	#print r_mask
+	#print(r_mask)
 	
 	# front face
 	q_in_r = rXp[r_mask,2]
@@ -141,7 +141,7 @@ def get_heliostat_to_receiver_data(simul, DNI, receiver_name):
 	results[:,3] = q_in_h
 	results[:,4] = q_in_r
 	results[:,5] = q_abs_h
-	#print results[:,0]
+	#print(results[:,0])
 	results = results[results[:,0].argsort()]
 	return results[:,2],results[:,4]
 	
@@ -191,12 +191,12 @@ def determine_field(simulfile, DNI, receiver_name, target_aperture_power, csv, c
 
 def plot(DM, pos_and_aiming):
 	num_hst_new=len(pos_and_aiming)-2
-	print num_hst_new
+	print(num_hst_new)
 	# plot 
 	fig, ax = plt.subplots(figsize=(16,9))
 	
 	for i in range(2,num_hst_new):
-		#print pos_and_aiming[i,0], pos_and_aiming[i,1]
+		#print(pos_and_aiming[i,0], pos_and_aiming[i,1])
 		circle = plt.Circle((float(pos_and_aiming[i,0]), float(pos_and_aiming[i,1])), radius=DM/2., ec='b',linewidth=0.5)
 		plt.gca().add_patch(circle)
 	plt.grid(linestyle='--')

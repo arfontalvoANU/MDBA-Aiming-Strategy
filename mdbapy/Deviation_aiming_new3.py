@@ -44,13 +44,14 @@ def return_metric(N_hst,A):
 		i+=1
 	return Metric
 
-def aiming(folder,r_height,r_diameter,C_aiming,csv,tower_h,num_bundle,Exp,A_f):
+def aiming(folder,r_height,r_diameter,C_aiming,csv,tower_h,num_bundle,Exp,A_f,stand_by=True):
 	#print C_aiming
 	title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 	r_radius=0.5*r_diameter
 	hst_info=np.loadtxt(csv,delimiter=',', skiprows=2) 
-	num_hst=hst_info.size/7
+	num_hst=int(hst_info.size/7)
 	N_hst=num_hst
+	num_bundle=int(num_bundle)
 	Azimuth_boundary=np.zeros(num_bundle+1) # from -90 to 270
 	for i in range(num_bundle+1):
 		Azimuth_boundary[i]=-90.+360./num_bundle*i
@@ -64,22 +65,27 @@ def aiming(folder,r_height,r_diameter,C_aiming,csv,tower_h,num_bundle,Exp,A_f):
 			# to calculate the azimuth angle
 			x=hst_info[j,0]
 			y=hst_info[j,1]
-			azimuth=np.arctan(y/x)/np.pi*180.
+			if abs(x)<1e-6:
+				azimuth=90.
+			else:
+				azimuth=np.arctan(y/x)/np.pi*180.				
 			if x<0:
 				azimuth+=180.
 			# to compare with the boundaries
 			if azimuth>=Azimuth_boundary[i] and azimuth<Azimuth_boundary[i+1]:
 				A=np.append(A,hst_info[j,:])
-		A=A.reshape(len(A)/7, 7)
+		A=A.reshape(int(len(A)/7), 7)
 		Hst_info.append(A)
+		
 	pos_and_aiming_new=np.array([])
+	Hst_info_ranked=[]
 	for i in range(num_bundle):
 		hst_info=Hst_info[i]
-		#print len(hst_info)
+		#print(len(hst_info))
 		foc=hst_info[:,3]
 		M=return_metric(N_hst,A_f[i])
 		hst_info_ranked = hst_info[np.argsort(foc)[::1]]
-		for j in range(len(hst_info)):
+		for j in range(int(len(hst_info))):
 			lmax=np.max(hst_info_ranked[:,3])
 			lmin=np.min(hst_info_ranked[:,3])
 			li=hst_info_ranked[j,3]
@@ -88,23 +94,48 @@ def aiming(folder,r_height,r_diameter,C_aiming,csv,tower_h,num_bundle,Exp,A_f):
 			hst_info_ranked[j,4]=hst_info_ranked[j,0]*r_radius/np.sqrt(hst_info_ranked[j,0]**2+hst_info_ranked[j,1]**2)
 			hst_info_ranked[j,5]=hst_info_ranked[j,1]*r_radius/np.sqrt(hst_info_ranked[j,0]**2+hst_info_ranked[j,1]**2)
 			hst_info_ranked[j,3]=np.sqrt((hst_info_ranked[j,0]-hst_info_ranked[j,4])**2+(hst_info_ranked[j,1]-hst_info_ranked[j,5])**2+(hst_info_ranked[j,2]-hst_info_ranked[j,6])**2)
-		pos_and_aiming_new=np.append(pos_and_aiming_new, hst_info_ranked)
-	pos_and_aiming_new=np.append(title,pos_and_aiming_new)
-	pos_and_aiming_new=pos_and_aiming_new.reshape(len(pos_and_aiming_new)/7, 7)
-	csv_new=csv='%s/pos_and_aiming_new.csv' % folder # the output field file
-	np.savetxt(csv_new, pos_and_aiming_new, fmt='%s', delimiter=',')
+		Hst_info_ranked.append(hst_info_ranked)
 	
+	# to move heliostats aiming outside to the stand-by point
+	safety_aiming=[50.,50.,tower_h+r_height*0.5]
+	Hst_stand=[]
+	#if (not np.all(C_aiming<=1.)):
+	for i in range(num_bundle):
+		hst_stand=0
+		J=[]
+		for j in range(int(len(Hst_info_ranked[i]))):			
+			if Hst_info_ranked[i][j,6]>(tower_h+r_height) or Hst_info_ranked[i][j,6]<tower_h:
+				#print pos_and_aiming_new[i,6],i
+				hst_stand+=1
+				Hst_info_ranked[i][j,4]=safety_aiming[0]
+				Hst_info_ranked[i][j,5]=safety_aiming[1]
+				Hst_info_ranked[i][j,6]=safety_aiming[2]
+				J.append(j)
+		if stand_by!=True:
+			Hst_info_ranked[i] = np.delete(Hst_info_ranked[i], J, axis=0)
+		Hst_stand.append(hst_stand)
+		pos_and_aiming_new=np.append(pos_and_aiming_new, Hst_info_ranked[i])
+	#else:
+		#for i in range(num_bundle):
+			#pos_and_aiming_new=np.append(pos_and_aiming_new, Hst_info_ranked[i])
+	
+	pos_and_aiming_new=np.append(title,pos_and_aiming_new)
+	pos_and_aiming_new=pos_and_aiming_new.reshape(int(len(pos_and_aiming_new)/7), 7)
+	csv_new='%s/pos_and_aiming_new.csv' % folder # the output field file
+	np.savetxt(csv_new, pos_and_aiming_new, fmt='%s', delimiter=',')
+	return Hst_info_ranked,Hst_stand
+
 if __name__=='__main__':
 	r_height=18. # receiver height
 	r_diameter=16.
 	folder=path[0]
-	csv='%s/pos_and_aiming.csv' % folder # the input field file
+	csv='%s/1.15/pos_and_aiming_trimmed.csv' % folder # the input field file
 	tower_h=175.
 	num_bundle=16
 	# C_aiming is an coefficienct array. Each coefficient corresponds to one tube bank.
 	# The orientation is the same as the meshing of the cylinder: south-east-north-west
 	C_aiming=np.zeros(num_bundle)
-	C_aiming[:]=0.45
+	C_aiming[:]=1.1
 	A_f=np.zeros(num_bundle)
 	A_f[:]=0.5 
 	Exp=np.zeros(num_bundle)

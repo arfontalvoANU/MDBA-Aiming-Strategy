@@ -35,7 +35,7 @@ class SolsticeScene:
 		annual - bool, do an annual performance simulation or not
 		'''
 		self.mainfolder=mainfolder
-		self.folder='%s/vtk' % mainfolder
+		self.folder=mainfolder
 		self.casename='demo'
 		
 		# Solar Related parameters        

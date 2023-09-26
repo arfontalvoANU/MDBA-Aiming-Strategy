@@ -187,30 +187,125 @@ class SunPosition:
 
         return delta, omega
 
+    def convert_convention(self, tool):
+        '''
+        tool: str, 'Tracer', 'solstice' or else TBD
+        '''
+        #TODO develope the transfermation from conventions in different tools 
+        pass
+
+    def annual_angles(self, latitude, hemisphere, casefolder='NOTSAVE', nd=5, nh=5):
+        '''
+        Arguements:
+        latitude: latitude of the location, deg
+        hemisphere: str, 'North' or 'South'
+        nd: number of points in the declination movement ( -- suggest nd>=5)
+        nh: number of points in the solar hours (half of the day)
+        '''
+     
+        # declination angle (deg)  
+        # -23.45 ~ 23.45
+        DELTA=N.linspace(-23.45, 23.45, nd)
+        #print 'declination', delta
+
+        # the maximum solar hour angle
+        # summer solstice
+        if hemisphere=='North':
+            delta_summer=23.45
+        elif hemisphere=='South':
+            delta_summer=-23.45
+        
+        daymax, sunmax=self.solarhour(delta_summer, latitude)
+        solartime=N.linspace(sunmax, 0, nh)
+        #print 'solar', solar
+
+        # solar time
+        time=12.+solartime/15
+        #print time
+
+        table=N.zeros(((nh+3)*(nd+4)))
+        table=table.astype(str)
+        for i in xrange(len(table)):
+            table[i]=' '
+
+        table=table.reshape(nh+3,nd+4)
+        table[0,6]='Declination (deg)'
+        table[0,7]=''
+        table[1,0]='Lookup table'
+        table[1,4:]=N.arange(1,nd+1)
+        table[2,2]='Solar time (h)'
+        table[2,3]='Hour angle (deg)'
+        table[2,4:]=DELTA
+        table[3:,1]=N.arange(1,nh+1)
+        table[3:,2]=time
+        table[3:,3]=solartime
+
+        c=1
+        case_list=N.array(['Case','declination (deg)','solar hour angle (deg)', 'azimuth (deg) S-to-W ', 'zenith (deg)'])
+        for i in xrange(len(DELTA)):
+            delta=DELTA[i]
+            hour, sunrise=self.solarhour(delta, latitude)
+            sunset=-sunrise
+            for j in xrange(len(solartime)):
+                omega=solartime[j]
+                if (omega>sunset or omega<sunrise):
+                    table[3+j,4+i]='-' 
+                else:
+                    table[3+j, 4+i]=' case %s'%(c)
+                    #zenith angle
+                    theta=self.zenith(latitude, delta, omega)
+                    # azimuth        
+                    phi=self.azimuth(latitude, theta, delta, omega)
+
+                    case_list=N.append(case_list, (c, delta, omega, phi, theta)) 
+                    c+=1
+                    
+     
+        case_list=case_list.reshape(len(case_list)/5,5)
+        azimuth=case_list[1:,-1].astype(float)
+        zenith=case_list[1:,-2].astype(float)
+
+        if casefolder!='NOTSAVE':    
+            N.savetxt(casefolder+'/table_view.csv', table, fmt='%s', delimiter=',')  
+            N.savetxt(casefolder+'/annual_simulation_list.csv', case_list, fmt='%s', delimiter=',')          
+
+        return azimuth, zenith
+
+        
 
 
 if __name__=='__main__':
 	# example: PS10, summer solstice, solar noon
-	latitude=34.96
+	latitude=34.85
 	
 	sun=SunPosition()
-	dd=sun.days(22, 'Jun')
+	
+	dd=sun.days(21, 'Jun')
 	delta=sun.declination(dd)
-	print 'Declination angle', delta
-
-
+	print('Declination angle', delta)
+	
+	#delta=-22.2927647419584
+	
 	daytime,sunrise=sun.solarhour(delta, latitude)
-	print 'Day timeS', daytime
-	print 'sun rise', sunrise
-	print ''
+	print('Day timeS', daytime)
+	print('sun rise', sunrise)
+	print('')
 	
 	
-	omega=3.*15 # solar noon
+	omega=45. # solar noon
 	theta=sun.zenith(latitude, delta, omega)
 	phi=sun.azimuth(latitude, theta, delta, omega)
-	print 'elevation', 90.-theta
-	print 'azimuth', phi
+	print('elevation', 90.-theta)
+	print('azimuth', phi)
 
+	sun.annual_angles(latitude, hemisphere='North', casefolder='.',nd=5, nh=9)
+ 
 	
+    
+    
 
 
+
+        
+        
+        

@@ -52,9 +52,12 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 	
 	# fit to the style consistent with the receiver model
 	Flux_blender=np.zeros(num_elem,dtype=float)
-	Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
-	Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
-	
+	if num_bundle%4==0:
+		Flux_blender[:int(0.25*num_elem)]=Flux_rev[int(0.75*num_elem):]
+		Flux_blender[int(0.25*num_elem):]=Flux_rev[:int(0.75*num_elem)]
+	else:
+		Flux_blender[:int(0.25*num_elem+0.5*bins)]=Flux_rev[int(0.75*num_elem-0.5*bins):]
+		Flux_blender[int(0.25*num_elem+0.5*bins):]=Flux_rev[:int(0.75*num_elem-0.5*bins)]
 	
 	Flux=np.arange(bins*(num_bundle+1),dtype=float).reshape(bins,num_bundle+1)
 	#print Flux.shape
@@ -62,7 +65,10 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 		Flux[i,0]=r_height-0.5*r_height/bins-r_height/bins*i 
 		for j in range(1,num_bundle+1):
 			Flux[i,j]=Flux_blender[bins*(j-1)+i]
-			#print i,j,Flux[i,j],bins*(j-1)+i
+	Flux_bank=np.array([])
+	for i in range(1,num_bundle+1):
+		Flux_bank=np.append(Flux_bank,sum(Flux[:,i])*r_height*r_diameter*np.pi/50/num_bundle)
+	
 	if flux_file==True:
 		title=np.array(7*(num_bundle+1))
 		title=np.array(['Flux intensity plot (units kW/m2)'])
@@ -89,7 +95,7 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 	theta = np.linspace(-np.pi, np.pi, num_bundle+1)
 	h = np.linspace(r_height, 0, bins)
 	theta, h = np.meshgrid(theta, h)
-	Flux=Flux[7:,1:].astype(np.float)
+	Flux=Flux[7:,1:].astype(float)
 	norm2 = colors.Normalize(vmin=np.amin(Flux), vmax=np.amax(Flux))
 	if flux_map==True:
 		fig = plt.figure()
@@ -103,11 +109,9 @@ def read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=False,flux_ma
 		cbar3.ax.tick_params(labelsize=20) 
 		ax1.tick_params(axis='both', which='major', labelsize=20)
 		plt.tight_layout()
-		plt.savefig(open('%s/flux_map.png'%folder,'w'), dpi=400)
-		plt.clf()
+		plt.savefig(open('%s/flux_map.png'%folder,'wb'), dpi=400)
 		plt.close(fig)
 		
-	print max_flux
 	return max_flux
 	
 
@@ -115,6 +119,6 @@ if __name__=='__main__':
 	folder=path[0]
 	r_height=24.
 	r_diameter=16.
-	num_bundle=12
+	num_bundle=16
 	bins=50 # the vertial binning number
 	read_data(folder,r_height,r_diameter,num_bundle,bins,flux_file=True,flux_map=True)

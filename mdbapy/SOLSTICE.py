@@ -11,8 +11,8 @@ import time
 from sys import path
 
 class SolsticeScene:
+	def __init__(self,mainfolder,num_rays,dni,azimuth,zenith,att_factor,csv,tower_h,h_cyl,r_cyl,num_bundle,hst_w, hst_h, mirror_reflectivity=0.9, slope_error=0.0015, sunshape='buie', sunshape_param=0.02):
 
-    def __init__(self,mainfolder,num_rays,dni,azimuth,zenith,att_factor,csv,tower_h,h_cyl,r_cyl,num_bundle):
 		'''
 		Import and define the parameters
 
@@ -22,9 +22,11 @@ class SolsticeScene:
 		casename - str, define that name of the case, for saving files
 		pmfile - str, the directory of the parameter input csv file
 		annual - bool, do an annual performance simulation or not
+		sunshape - str, 'buie' or 'pillbox'
+		sunshape_param - float, the csr for buie sunshape, or the half angle for pillbox sunshape, note that the unit is deg for the pillbox angle 
 		'''
 		self.mainfolder=mainfolder
-		self.folder='%s/vtk' % mainfolder
+		self.folder=mainfolder
 		self.casename='demo'
 		
 		# Solar Related parameters        
@@ -33,14 +35,16 @@ class SolsticeScene:
 		self.num_rays=num_rays
 		self.dni=float(dni)
 		# heliostat related parameters
-		self.mirror_reflectivity=0.9
+		self.mirror_reflectivity=mirror_reflectivity
 		#self.slope=0.0014020
-		self.slope=0.0015
+		self.slope=slope_error
 		self.hst_dir=csv
-		self.hst_w=12.20
-		self.hst_h=12.20
+		self.hst_w=hst_w
+		self.hst_h=hst_h
 		self.att_factor=att_factor
 		self.tower_h=tower_h
+		self.sunshape=sunshape
+		self.sunshape_param=sunshape_param
 
 		# receiver related parameters
 		self.absorptivity=1. # absorptivity of the pipes
@@ -52,7 +56,7 @@ class SolsticeScene:
 		self.r_cyl=r_cyl
 		self.num_bundle=num_bundle
 		
-    def gen_YAML(self):
+	def gen_YAML(self):
 
 		'''
 		Generate YAML file 
@@ -65,10 +69,15 @@ class SolsticeScene:
 		# ----------------------------- CREATION OF THE SUN ------------------------
 		#
 		# CREATE The sun
-		hal_angle = 4.65e-3*180./np.pi
+		#hal_angle = 4.65e-3*180./np.pi
 		#st_dev = 2.51e-3*180./np.pi
 		#fd.write('- sun: {dni:  %s, pillbox: {half_angle: %s}}\n' % (self.dni,hal_angle))
-		fd.write('- sun: {dni:  %s, buie: {csr: 0.000002}}\n' % (self.dni))
+		if self.sunshape=='buie':
+			sunshape_par_n='csr'
+		elif self.sunshape=='pillbox':
+			sunshape_par_n='half_angle'
+
+		fd.write('- sun: {dni:  %s, %s: {%s: %s}}\n' % (self.dni, self.sunshape, sunshape_par_n, self.sunshape_param))
 		#fd.write('- sun: {dni:  %s, gaussian: {std_dev: %s}}\n' % (self.dni,st_dev))
 
 		# ----------------------------- CREATION OF THE ATMOSPHERE ------------------
@@ -119,7 +128,6 @@ class SolsticeScene:
 		#----------------------- CREATION OF GEOMETRIES -----------------------------
 		#
 		
-
 
 		#    Receiver Geometry
 		#
@@ -288,74 +296,17 @@ class SolsticeScene:
 		# -------------------------------------- END OF THE YAML PARSER WRITTING
 		fd.close()
 
-    def runSOLSTICE(self, savefile, azi=0., zenith=0., view=False):
-        '''
-        run SOLSTICE with the corresponding sun position  
-        and postprocessing the result   
-        azi: from East to North
-        zenith: 0 is the horizontal (in Solstice)
-        view - if check it in paraview   
-        '''
-        azi=self.azimuth
-        zenith=self.zenith
+	def runSOLSTICE(self, savefile, azi=0., zenith=0., view=False):
+		'''
+		run SOLSTICE with the corresponding sun position  
+		and postprocessing the result   
+		azi: from East to North
+		zenith: 0 is the horizontal (in Solstice)
+		view - if check it in paraview   
+		'''
+		azi=self.azimuth
+		zenith=self.zenith
 
-        os.system('solstice -D%s,%s -v -n %s -R %s/%s-rcv.yaml -fo %s/simul %s/%s.yaml'%(azi,zenith, self.num_rays, self.folder, self.casename,savefile,self.folder,self.casename))
+		os.system('solstice -D%s,%s -t 4 -v -n %s -R %s/%s-rcv.yaml -fo %s/simul %s/%s.yaml'%(azi,zenith, self.num_rays, self.folder, self.casename,savefile,self.folder,self.casename))
 
-'''
-        if view:
-            os.system('solstice -D%s,%s -g format=obj:split=geometry -fo %s/geom %s/%s.yaml'%(azi, zenith,savefile, self.folder, self.casename))
-            os.system('solstice -D%s,%s -q -n 100 -R %s/%s-rcv.yaml -p default %s/%s.yaml > %s/solpaths'%(azi, zenith, self.folder, self.casename, self.folder, self.casename, savefile ))
 
-            # postprocessing in C (provided by Cyril Caliot)
-            #Read "simul" results and produce a text file with the raw results
-            os.system('gcc ./postprocessing/solppraw.c -o %s/solppraw'%savefile)
-            os.system('%s/solppraw %s/simul'%(savefile, savefile))
-
-            #Read "simul" results and produce receiver files (.vtk) of incoming and/or absorbed solar flux per-primitive
-            os.system('gcc ./postprocessing/solmaps.c -o %s/solmaps'%savefile)
-            os.system('%s/solmaps %s/simul'%(savefile,savefile))
-            
-            
-            #Read "geom" and "simul" file results and produce primaries and receivers files (.vtk), and .obj geometry files
-            os.system('gcc ./postprocessing/solpp.c -o %s/solpp'%savefile)
-            os.system('%s/solpp %s/geom %s/simul'%(savefile,savefile, savefile))
-
-            #Read "solpaths" file and produce readable file (.vtk) by paraview to visualize the ray paths
-            os.system('gcc ./postprocessing/solpaths.c -o %s/solpath'%savefile)
-            os.system('%s/solpath %s/solpaths'%(savefile, savefile))
-            
-            os.system('mv *vtk %s'%savefile)
-            os.system('mv *obj %s'%savefile)
-            os.system('mv *txt %s'%savefile)
-
-            #rawfile='%s/simul'%savefile
-            #eta_tot=proces_raw_results(rawfile,savefile)
-
-        else:
-            #Read "simul" results and produce a text file with the raw results
-            os.system('gcc ./postprocessing/solppraw.c -o %s/solppraw'%savefile)
-            os.system('%s/solppraw %s/simul'%(savefile,savefile))
-            os.system('mv *txt %s'%savefile)
-            #rawfile='%s/simul'%savefile
-            #eta_tot=proces_raw_results(rawfile,savefile)
-
-        #return eta_tot
-   '''
-
-num_rays_1=5000000
-att_factor_1=0.000107831395772
-mainfolder_1='/mnt/fb7cc2c9-e328-4f3f-a6f8-918195722408/MDBA-Aiming-Strategy/example'
-casefolder='%s/vtk' % mainfolder_1
-csv_1='/mnt/fb7cc2c9-e328-4f3f-a6f8-918195722408/MDBA-Aiming-Strategy/example/pos_and_aiming_new.csv'
-if not os.path.exists(casefolder):
-	os.makedirs(casefolder)
-azimuth_1=270.0
-zenith_1=55.15
-dni_1=980.0
-r_cyl_1=8.0
-h_cyl_1=24.0
-tower_h_1=175.0
-num_bundle_1=16
-scene=SolsticeScene(mainfolder=mainfolder_1,num_rays=num_rays_1,dni=dni_1,azimuth=azimuth_1,zenith=zenith_1,att_factor=att_factor_1,csv=csv_1,tower_h=tower_h_1,r_cyl=r_cyl_1,h_cyl=h_cyl_1,num_bundle=num_bundle_1)
-scene.gen_YAML()
-scene.runSOLSTICE(savefile=casefolder, view=True)
