@@ -10,6 +10,11 @@ from scipy.interpolate import interp2d
 from pandas import DataFrame
 from sklearn import linear_model
 
+import colorama
+colorama.init()
+def yellow(text):
+	return colorama.Fore.CYAN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
 def flux_limits(mf, Ts, flux_limits_file):
 	# Net flux limits in W.m2 for Ts in K and for mass flows of 1 to 5 kg/s in OD 60.3 mm 740H pipes with 1.2 mm wall thickness.
 	data = N.loadtxt(flux_limits_file, delimiter=',')
@@ -31,7 +36,7 @@ def flux_limits_V(V, Ts, flux_limits_file):
 	return flux_lim[:,0]
 	
 def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None,overflux=True,sf_vector=[1.,1.,1.,0.97,0.85,0.85,0.81,0.81,0.78]):
-	print("tower receiver plotting")
+	print(yellow('	Running tower_receiver_plots from Open_CSPERB_plots.py ...'))
 	fileo = open(files,'rb')
 	data = pickle.load(fileo)
 	fileo.close()
@@ -89,7 +94,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 	
 	plt.rc('font', size=8)
 	eff_rec=N.sum(q_net)/N.sum(fluxmap*areas[ahr_map])
-	print('Receiver efficiency: '+str(eff_rec))
+	print(yellow('	Receiver efficiency: ') + str(eff_rec))
 	# Qin, eff_abs,eff_ems,T_ext_mean,h_ext,q_refl,q_emi,q_conv,eff_rec
 	#print(T_ext)
 	#print(N.average(T_ext),N.sqrt(N.sqrt(N.average(T_ext**4))),h_conv_ext)
@@ -533,6 +538,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		C_safe=N.array([])
 		C_net=N.array([])
 		S_ratio=N.array([])
+		excess_flux=N.array([])
 		for f in range(int(len(fp))):
 			bank_lengths = pipe_lengths[f]
 			bank_lengths_2 = (bank_lengths[1:]+bank_lengths[:-1])/2.
@@ -570,6 +576,9 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 			D=safety_factor[:-1]*flux_lims[:-1]-flux_in[f]/1e3 # difference between flux limits and net flux
 			num_pass=n_banks/len(fp)
 			for i in range(int(num_pass)):
+				# Saving the excess flux for calculating a proportional step 
+				lower_bound = i*50; upper_bound = 1 + lower_bound + 50
+				excess_flux = N.append(excess_flux,N.min(D[lower_bound:upper_bound]))
 				Q_net_part=Q_net[n_elems*i:n_elems*(i+1)]
 				Q_safe_part=safe_flux_lims[n_elems*i:n_elems*(i+1)]
 				bank_lengths_part=bank_lengths[n_elems*i:n_elems*(i+1)]
@@ -659,7 +668,7 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 		plt.savefig('%s_flux_fp.png'%saveloc, dpi=200)
 		plt.close('all')
 		plt.clf()
-		aiming_results=[Success,Positive,A_over,C_safe,C_net,S_ratio]
+		aiming_results=[Success,Positive,A_over,C_safe,C_net,S_ratio,excess_flux]
 	return results,aiming_results,vel_max
 
 def simple_tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, flow_paths=True, saveloc=None, billboard=False, flux_limits_file=None,C_aiming=None):

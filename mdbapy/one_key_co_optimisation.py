@@ -28,9 +28,23 @@ from .SOLSTICE import SolsticeScene
 import pickle, colorama
 from tqdm import tqdm
 
+import warnings
 colorama.init()
 def yellow(text):
 	return colorama.Fore.YELLOW + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
+
+def print_vector(vector_name,vector_values,fmt='float',indents=2):
+	total_label_length = 23
+	vector_name_length = len(vector_name)
+	remaining_label = ' '*(total_label_length - vector_name_length)
+	vector_name = '	'*indents + yellow(vector_name + ':') + remaining_label
+	if fmt=='float':
+		vector_values = ','.join('%.2f'%x for x in vector_values)
+	elif fmt=='scientific':
+		vector_values = ','.join('%.e'%x for x in vector_values)
+	else:
+		showwarning(f'print_vector fmt {fmt} is not valid. Using the float format instead.')
+	print(f'{vector_name}[{vector_values}]')
 
 class one_key_start:
 	def __init__(self, casedir, tower_h, Q_rec, T_in, T_out, HTF, rec_material, r_diameter, r_height, fluxlimitpath, SM, oversizing, delta_r2, delta_r3, hst_w, hst_h, mirror_reflectivity, slope_error, sunshape='buie', sunshape_param=0.02, num_rays=1000000, latitude=34.85,sf_vector=[1.,1.,1.,1.,1.,1.,1.,1.,1.]):
@@ -57,7 +71,6 @@ class one_key_start:
 		sunshape_param (float): the csr value if sunshape is Buie, the angular width (in degree) if sunshape is pillbox
 		num_rays (int): number of rays in the ray tracing
 		latitude (float): latitude of the plant location (degree)
-
 		"""
 
 		self.sf_vector=sf_vector
@@ -67,18 +80,17 @@ class one_key_start:
 			os.makedirs(casedir)
 
 		#shutil.copy('%s/SOLSTICE.py' % casedir, casedir) # for ray-tracing
-		
+
 		# power calculation
 		#Q_rec = 111.e6/0.51*SM # receiver nominal output
 		Q_rec_inc = Q_rec/0.88*oversizing # field nominal output
 		num_hst=int(Q_rec_inc/0.6/980./(hst_w*hst_h)*1.3) # estimated number of hst for the large field
-		print('Receiver nominal output', Q_rec)
-		print('Field nominal output', Q_rec_inc)
-		print('Estimated num hsts', num_hst)
+		print('Receiver nominal output:     ', Q_rec)
+		print('Field nominal output:        ', Q_rec_inc)
+		print('Estimated num heliostats:    ', num_hst)
 
-		
 		self.latitude=latitude # latitude of the field location
-		
+
 		# for the heliostat field
 		self.hst_w=hst_w # heliostat width
 		self.hst_h=hst_h # heliostat height
@@ -111,7 +123,7 @@ class one_key_start:
 		elif HTF=='salt':
 			self.HC=Solar_salt()
 		else:
-			print('ERROR: receiver HTF not found')			
+			print('ERROR: receiver HTF not found')
 
 		self.rec_material=rec_material	
 		if rec_material=='Haynes230':
@@ -385,7 +397,7 @@ class one_key_start:
 
 		# initialization for aiming
 		C_aiming=np.zeros(self.num_bundle)
-		C_aiming[:]=0.4
+		C_aiming[:]=0.1
 		Exp=np.zeros(self.num_bundle)
 		Exp[:]=3.0
 		A_f=np.zeros(self.num_bundle)
@@ -432,22 +444,31 @@ class one_key_start:
 		results,aiming_results,vel_max,Strt=self.HT_model(25.,5.)
 		Vel_bool=vel_max<2.44
 		print('	Q_abs', q_results[-1])
-		print('	Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
-		print('	Shape exponent:    [' + ','.join('%.2f'%x for x in Exp) + ']')
-		print('	Asymmetry factor:  [' + ','.join('%.2f'%x for x in A_f) + ']')
+		print_vector('Aiming extent',C_aiming,indents=1)
+		print_vector('Shape exponent',Exp,indents=1)
+		print_vector('Asymmetry factor',A_f,indents=1)
 		print('	aiming_results[1]: %s/%s'%(np.sum(aiming_results[1]), len(aiming_results[1])))  # for each tube bank
 		print('	Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool))) # for each flow path
 		print('	vel_max:', np.max(vel_max))
 
-		gap=0.05
+		min_step = 1e-2  # This is the minimum step size allowed for C_aiming adjustment.
+		max_step = 5e-2  # This is the maximum step size allowed for C_aiming adjustment.
+
+		gap_exp_aiming=0.2
+		gap_af_aiming=0.02
+#		gap=max_step
+		gap=min_step
 		Defocus=np.all(aiming_results[1])==False
 		title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 
 		# search algorithm
 		ite1=0
+		x_history = C_aiming
+		y_history = aiming_results[6]
+		gap_list = gap*np.ones(len(C_aiming))
 		pos_and_aiming_stand_by=np.array([])
 		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False) and ite1<100): #and np.all(C_aiming<1.):
-			print('		Iteration', ite1)	
+			print('		Iteration', ite1)
 
 			if np.all(C_aiming<1.)==False:
 				# instead of extent E, defocus high-foc heliostats
@@ -476,9 +497,16 @@ class one_key_start:
 				C_aiming_old=np.ones(self.num_bundle)
 				C_aiming_old[:]=C_aiming[:]
 				for i in range(self.num_bundle):
+					if ite1 > 1:
+						x = x_history[:,i]
+						y = y_history[:,i]
+						x_new = x[ite1] - y[ite1]/(y[ite1-1] - y[ite1])*(x[ite1-1] - x[ite1])
+#						gap = max_step
+						gap = np.clip(x_new - x[ite1], min_step, max_step)
+						gap_list[i] = gap
 					if aiming_results[1][i]==False or Vel_bool[i]==False:
-						if C_aiming[int(Strt[i])]>0.8:
-							gap=0.05
+#						if C_aiming[int(Strt[i])]>0.8:
+#							gap=0.05
 						C_aiming[int(Strt[i])]+=gap
 						if np.all(C_aiming<1.0):
 							if Strt[i]==self.num_bundle-1:
@@ -493,19 +521,19 @@ class one_key_start:
 						# for A
 						if A_f[int(Strt[i])]>0.5:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]+=0.02
+								A_f[int(Strt[i])]+=gap_af_aiming
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]-=0.02
+								A_f[int(Strt[i])]-=gap_af_aiming
 						else:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]-=0.02
+								A_f[int(Strt[i])]-=gap_af_aiming
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]+=0.02
+								A_f[int(Strt[i])]+=gap_af_aiming
 						# for S
 						if aiming_results[5][i]>0.55:
-							Exp[int(Strt[i])]-=0.2
+							Exp[int(Strt[i])]-=gap_exp_aiming
 						elif aiming_results[5][i]<0.45:
-							Exp[int(Strt[i])]+=0.2
+							Exp[int(Strt[i])]+=gap_exp_aiming
 			C_aiming[C_aiming>1.]=1.0
 			Exp[Exp<0.2] = 0.2
 			Exp[Exp>3.4] = 3.4
@@ -537,15 +565,21 @@ class one_key_start:
 			read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True,flux_map=False)
 			results,aiming_results,vel_max,Strt=self.HT_model(25.,5.,overflux=not np.all(aiming_results[1]))
 			Vel_bool=vel_max<2.44
-			print('		Aiming extent:     [' + ','.join('%.2f'%x for x in C_aiming) + ']')
-			print('		Shape exponent:    [' + ','.join('%.2f'%x for x in Exp) + ']')
-			print('		Asymmetry factor:  [' + ','.join('%.2f'%x for x in A_f) + ']')
+			print_vector('Step Aiming extent',gap_list,fmt='scientific')
+			try:
+				print_vector('Minimum Distance',y_history[ite1])
+			except:
+				print_vector('Minimum Distance',y_history)
+			print_vector('Aiming extent',C_aiming)
+			print_vector('Shape exponent',Exp)
+			print_vector('Asymmetry factor',A_f)
 			print('		aiming_results[1]: %s/%s'%(np.sum(aiming_results[1]), len(aiming_results[1])))
 			print('		Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool)))
 			print('		vel_max:', np.max(vel_max))
+			x_history = np.vstack((x_history,C_aiming))
+			y_history = np.vstack((y_history,aiming_results[6]))
 			ite1+=1
 
-			
 		# save the stand-by hst
 		pos_and_aiming_stand_by=np.append(title,pos_and_aiming_stand_by)
 		pos_and_aiming_stand_by=pos_and_aiming_stand_by.reshape(int(len(pos_and_aiming_stand_by)/7), 7)
