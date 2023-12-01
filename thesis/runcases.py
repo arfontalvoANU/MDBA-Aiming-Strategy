@@ -104,7 +104,7 @@ def run_cases(args):
 			for case in range(data.shape[0]):
 				CASEDIR=os.path.join(DNIDIR,'job%d'%case)
 				os.chdir(CASEDIR)
-				os.system('qsub -N %sT%dD%sJ%d jobscript'%(mydict[material],temperature,dni,case)) # CHANGE THIS JOB NAME
+				os.system('qsub -N %sT%dD%sJ%d jobscript'%(mydict[args.material],args.T,dni,case)) # CHANGE THIS JOB NAMEs
 
 		CASEDIR=os.path.join(MATDIR,'equinox')
 		os.chdir(CASEDIR)
@@ -119,8 +119,9 @@ if __name__ == '__main__':
 	parser.add_argument('--WT', type=float, default=1.2)
 	parser.add_argument('--T', type=int, default=565)
 	parser.add_argument('--sf_vector', type=float, nargs=9, default=[1,1,1,0.9725,0.8375,0.8475,0.8125,0.8125,0.7575])
-	parser.add_argument('--submit', type=bool, default=True)
+	parser.add_argument('--submit',action='store_true')
+	parser.add_argument('--no-submit', dest='submit', action='store_false')
+	parser.set_defaults(submit=True)
 
 	args = parser.parse_args()
-	args.submit=False
 	run_cases(args)
