@@ -467,7 +467,7 @@ class one_key_start:
 		y_history = aiming_results[6]
 		gap_list = gap*np.ones(len(C_aiming))
 		pos_and_aiming_stand_by=np.array([])
-		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False) and ite1<100): #and np.all(C_aiming<1.):
+		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False) and ite1<200): #and np.all(C_aiming<1.):
 			print('		Iteration', ite1)
 
 			if np.all(C_aiming<1.)==False:
