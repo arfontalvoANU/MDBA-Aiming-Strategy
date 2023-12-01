@@ -6,7 +6,7 @@ import argparse
 import numpy as np
 
 def run_cases(args):
-	FILEDIR=os.getcwd()
+	FILEDIR=os.path.dirname(os.path.abspath(__file__))
 
 	data=np.genfromtxt(os.path.join(FILEDIR,'cases.csv'), delimiter=',')
 
@@ -16,7 +16,7 @@ def run_cases(args):
 		s+=f'{item} '
 	args.sf_vector = s
 
-	MATDIR=os.path.join('scratch',args.project,'af5590','mdba_jobs',args.casename) # CHANGE THIS FOLDER NAME
+	MATDIR=os.path.join('/scratch',args.project,'af5590','mdba_jobs',args.casename) # CHANGE THIS FOLDER NAME
 
 	if not os.path.exists(MATDIR):
 		os.mkdir(MATDIR)
@@ -52,7 +52,7 @@ def run_cases(args):
 			s+='source /scratch/xa1/software-package/solstice-0.9.0/etc/solstice.profile\n'
 			s+='\n'
 			s+='cd %s\n'%CASEDIR
-			s+='python3.8 %s/runGemasolar.py --material %s --D0 %s --WT %s --T %d --dnir %s --case %d  --sf_vector %s'%(FILEDIR,args.material,args.D0,args.WT,args.T,args.dnir,case,args.sf_vector)
+			s+='python3.8 %s/runGemasolar.py --material %s --D0 %s --WT %s --T %d --dnir %s --case %d  --sf_vector %s'%(FILEDIR,args.material,args.D0,args.WT,args.T,dnir,case,args.sf_vector)
 
 			if not os.path.exists(CASEDIR):
 				os.mkdir(CASEDIR)
