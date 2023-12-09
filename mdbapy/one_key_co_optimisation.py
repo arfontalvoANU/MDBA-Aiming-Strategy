@@ -397,7 +397,7 @@ class one_key_start:
 
 		# initialization for aiming
 		C_aiming=np.zeros(self.num_bundle)
-		C_aiming[:]=0.1
+		C_aiming[:]=0.4
 		Exp=np.zeros(self.num_bundle)
 		Exp[:]=3.0
 		A_f=np.zeros(self.num_bundle)
@@ -451,24 +451,15 @@ class one_key_start:
 		print('	Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool))) # for each flow path
 		print('	vel_max:', np.max(vel_max))
 
-		min_step = 1e-2  # This is the minimum step size allowed for C_aiming adjustment.
-		max_step = 5e-2  # This is the maximum step size allowed for C_aiming adjustment.
-
-		gap_exp_aiming=0.2
-		gap_af_aiming=0.02
-#		gap=max_step
-		gap=min_step
+		gap=0.05
 		Defocus=np.all(aiming_results[1])==False
 		title=np.array(['x', 'y', 'z', 'foc', 'aim x', 'aim y', 'aim z', 'm', 'm', 'm', 'm', 'm', 'm', 'm'])
 
 		# search algorithm
 		ite1=0
-		x_history = C_aiming
-		y_history = aiming_results[6]
-		gap_list = gap*np.ones(len(C_aiming))
 		pos_and_aiming_stand_by=np.array([])
 		while ((np.all(aiming_results[1])==False or np.all(Vel_bool)==False) and ite1<200): #and np.all(C_aiming<1.):
-			print('		Iteration', ite1)
+			print('		Iteration', ite1)	
 
 			if np.all(C_aiming<1.)==False:
 				# instead of extent E, defocus high-foc heliostats
@@ -497,16 +488,9 @@ class one_key_start:
 				C_aiming_old=np.ones(self.num_bundle)
 				C_aiming_old[:]=C_aiming[:]
 				for i in range(self.num_bundle):
-					if ite1 > 1:
-						x = x_history[:,i]
-						y = y_history[:,i]
-						x_new = x[ite1] - y[ite1]/(y[ite1-1] - y[ite1])*(x[ite1-1] - x[ite1])
-#						gap = max_step
-						gap = np.clip(x_new - x[ite1], min_step, max_step)
-						gap_list[i] = gap
 					if aiming_results[1][i]==False or Vel_bool[i]==False:
-#						if C_aiming[int(Strt[i])]>0.8:
-#							gap=0.05
+						if C_aiming[int(Strt[i])]>0.8:
+							gap=0.05
 						C_aiming[int(Strt[i])]+=gap
 						if np.all(C_aiming<1.0):
 							if Strt[i]==self.num_bundle-1:
@@ -521,19 +505,19 @@ class one_key_start:
 						# for A
 						if A_f[int(Strt[i])]>0.5:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]+=gap_af_aiming
+								A_f[int(Strt[i])]+=0.02
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]-=gap_af_aiming
+								A_f[int(Strt[i])]-=0.02
 						else:
 							if (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])<-0.1:
-								A_f[int(Strt[i])]-=gap_af_aiming
+								A_f[int(Strt[i])]-=0.02
 							elif (aiming_results[3][i]-aiming_results[4][i])/abs(aiming_results[4][i])>0.1:
-								A_f[int(Strt[i])]+=gap_af_aiming
+								A_f[int(Strt[i])]+=0.02
 						# for S
 						if aiming_results[5][i]>0.55:
-							Exp[int(Strt[i])]-=gap_exp_aiming
+							Exp[int(Strt[i])]-=0.2
 						elif aiming_results[5][i]<0.45:
-							Exp[int(Strt[i])]+=gap_exp_aiming
+							Exp[int(Strt[i])]+=0.2
 			C_aiming[C_aiming>1.]=1.0
 			Exp[Exp<0.2] = 0.2
 			Exp[Exp>3.4] = 3.4
@@ -565,19 +549,12 @@ class one_key_start:
 			read_data(self.casedir,self.r_height,self.r_diameter,self.num_bundle,self.bins,flux_file=True,flux_map=False)
 			results,aiming_results,vel_max,Strt=self.HT_model(25.,5.,overflux=not np.all(aiming_results[1]))
 			Vel_bool=vel_max<2.44
-			print_vector('Step Aiming extent',gap_list,fmt='scientific')
-			try:
-				print_vector('Minimum Distance',y_history[ite1])
-			except:
-				print_vector('Minimum Distance',y_history)
 			print_vector('Aiming extent',C_aiming)
 			print_vector('Shape exponent',Exp)
 			print_vector('Asymmetry factor',A_f)
 			print('		aiming_results[1]: %s/%s'%(np.sum(aiming_results[1]), len(aiming_results[1])))
 			print('		Vel_bool: %s/%s'%(np.sum(Vel_bool), len(Vel_bool)))
 			print('		vel_max:', np.max(vel_max))
-			x_history = np.vstack((x_history,C_aiming))
-			y_history = np.vstack((y_history,aiming_results[6]))
 			ite1+=1
 
 		# save the stand-by hst
