@@ -15,6 +15,10 @@ colorama.init()
 def yellow(text):
 	return colorama.Fore.CYAN + colorama.Style.BRIGHT + text + colorama.Style.RESET_ALL
 
+from scipy.signal import savgol_filter
+def moving_average(data, window_size):
+	return N.convolve(data, N.ones(window_size)/window_size, mode='valid')
+
 def flux_limits(mf, Ts, flux_limits_file):
 	# Net flux limits in W.m2 for Ts in K and for mass flows of 1 to 5 kg/s in OD 60.3 mm 740H pipes with 1.2 mm wall thickness.
 	data = N.loadtxt(flux_limits_file, delimiter=',')
@@ -564,10 +568,21 @@ def tower_receiver_plots(files, efficiency=True, maps_3D=True, flux_map=True, fl
 					plt.text(x=bank_lengths[120], y=1300, s='Fp %s'%str(f+1), ha='right',fontsize=size)
 				elif n_banks/len(fp)==2:
 					plt.text(x=bank_lengths[n_elems], y=1500, s='Fp %s'%str(f+1), ha='right',fontsize=size)
-			
+			# Smoothing incident flux
+			window_size = 5  # Change this value to adjust the amount of smoothing
+			incident_flux = flux_in[f]
+			smoothed_incident_flux = moving_average(incident_flux, window_size)
+			# To ensure the same number of elements, we can pad the smoothed data
+			pad_size = len(incident_flux) - len(smoothed_incident_flux)
+			# Updating incident flux with smoothed values
+			flux_in[f] = savgol_filter(incident_flux, 11, 3)
+			# Plotting incident flux
 			plt.plot(bank_lengths_2, flux_in[f]/1e3, label=r'${\dot{q}^{\prime \prime}_\mathrm{inc}}$', color='0.6')
+			# Calculating flux limits
 			flux_lims = flux_limits_V(V[f], T_HC[f], flux_limits_file)/1e3
+			# Scaling flux limits based on the panel safety factors
 			safe_flux_lims = safety_factor*flux_lims
+			# Plotting flux limits and the scaled flux limit based on the panel safety factors
 			plt.plot(bank_lengths, flux_lims, color='r',linewidth=1.,label=r'${\dot{q}^{\prime \prime}_\mathrm{limit}}$')
 			plt.plot(bank_lengths, safe_flux_lims, color='r',linestyle='--',linewidth=1.,label=r'${\dot{q}^{\prime \prime}_\mathrm{safe}}$')
 			Q_net=flux_in[f]/1e3
