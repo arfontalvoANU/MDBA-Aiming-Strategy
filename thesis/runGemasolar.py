@@ -58,7 +58,7 @@ class SaltAnnualTrimmedField:
 			slope_error=0.5*np.sqrt(4*pow(2.6e-3,2)+pow(2.1e-3,2)),
 			sunshape='pillbox',
 			sunshape_param=np.degrees(4.65e-3),
-			num_rays=int(5e7),
+			num_rays=int(1e7),
 			latitude=37.56,
 			sf_vector=sf_vector
 			)
@@ -72,13 +72,13 @@ class SaltAnnualTrimmedField:
 		T_int = np.append(T_int,600.) + 273.15
 		ThermoElasticPeakFlux.fluxLim(Model.D0,Model.WT,os.path.join(LIMITS_DIR,Model.material_name),Model.mat,vfs,T_int)
 		data = np.genfromtxt(os.path.join(os.path.dirname(__file__),'cases.csv'),delimiter=',')
-		Model.MDBA_aiming_new(dni=dnir*data[index,0],phi=data[index,1],elevation=data[index,2])
+		Model.MDBA_aiming_new(dni=dnir*data[index,5],phi=data[index,6],elevation=data[index,7])
 		# RLLT
 		n = data[index,3]
 		m = data[index,4]
 		if dnir==1:
 			if n==3 or n==5 or n==7:
-				dni=dnir*data[index,0]
+				dni=dnir*data[index,5]
 				max_flux=read_data(casedir,Model.r_height,Model.r_diameter,Model.num_bundle,Model.bins,flux_file=True)
 				for i in range(int(len(T_amb_g))):
 					print('T_abm_g, 3', T_amb_g[i],3.)

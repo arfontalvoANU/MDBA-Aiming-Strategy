@@ -32,7 +32,7 @@ def run_cases(args):
 
 			s='#!/bin/sh\n'
 			s+='#PBS -S /bin/sh\n'
-			s+='#PBS -P xa1\n'
+			s+=f'#PBS -P {args.project}\n'
 			s+='#PBS -q normal\n'
 			s+='#PBS -l walltime=03:00:00,mem=8GB,ncpus=4\n'
 			s+='#PBS -N runGemasolar\n'
@@ -44,15 +44,10 @@ def run_cases(args):
 			s+='\n'
 			s+='module load python3/3.8.5\n'
 			s+='\n'
-			s+='export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/scratch/xa1/software-package/om-inst-v1.14.2/lib\n'
-			s+='export PATH=$PATH:/scratch/xa1/software-package/om-inst-v1.14.2/bin\n'
-			s+='export PYTHONPATH=$PYTHONPATH:/scratch/xa1/af5590/st-inst-af/lib/python3.8/site-packages\n'
-			s+='export OPENMODELICALIBRARY=/scratch/xa1/af5590/st-inst-af/lib/omlibrary:/scratch/xa1/software-package/om-inst-v1.14.2/lib/omlibrary/\n'
-			s+='\n'
-			s+='source /scratch/xa1/software-package/solstice-0.9.0/etc/solstice.profile\n'
+			s+=f'source /scratch/{args.project}/software-package/solstice-0.9.0/etc/solstice.profile\n'
 			s+='\n'
 			s+='cd %s\n'%CASEDIR
-			s+='python3.8 %s/runGemasolar.py --material %s --D0 %s --WT %s --T %d --dnir %s --case %d  --sf_vector %s'%(FILEDIR,args.material,args.D0,args.WT,args.T,dnir,case,args.sf_vector)
+			s+=f'python3.8 {FILEDIR}/runGemasolar.py --material {args.material} --D0 {args.D0} --WT {args.WT} --T {args.T:d} --dnir {dnir} --case {case}  --sf_vector {args.sf_vector}'
 
 			if not os.path.exists(CASEDIR):
 				os.mkdir(CASEDIR)
@@ -72,9 +67,9 @@ def run_cases(args):
 
 	s='#!/bin/sh\n'
 	s+='#PBS -S /bin/sh\n'
-	s+='#PBS -P xa1\n'
+	s+=f'#PBS -P {args.project}\n'
 	s+='#PBS -q normal\n'
-	s+='#PBS -l walltime=02:00:00,mem=16GB,ncpus=8\n'
+	s+='#PBS -l walltime=03:00:00,mem=8GB,ncpus=4\n'
 	s+='#PBS -N runGemasolar\n'
 	s+='#PBS -o runGemasolar.out\n'
 	s+='#PBS -e runGemasolar.err\n'
@@ -84,15 +79,10 @@ def run_cases(args):
 	s+='\n'
 	s+='module load python3/3.8.5\n'
 	s+='\n'
-	s+='export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/scratch/xa1/software-package/om-inst-v1.14.2/lib\n'
-	s+='export PATH=$PATH:/scratch/xa1/software-package/om-inst-v1.14.2/bin\n'
-	s+='export PYTHONPATH=$PYTHONPATH:/scratch/xa1/af5590/st-inst-af/lib/python3.8/site-packages\n'
-	s+='export OPENMODELICALIBRARY=/scratch/xa1/af5590/st-inst-af/lib/omlibrary:/scratch/xa1/software-package/om-inst-v1.14.2/lib/omlibrary/\n'
-	s+='\n'
-	s+='source /scratch/xa1/software-package/solstice-0.9.0/etc/solstice.profile\n'
+	s+=f'source /scratch/{args.project}/software-package/solstice-0.9.0/etc/solstice.profile\n'
 	s+='\n'
 	s+='cd %s\n'%CASEDIR
-	s+='python3.8 %s/runEquinox.py --material %s --D0 %s --WT %s --T %d --dnir 1.0 --case 0  --sf_vector %s'%(FILEDIR,args.material,args.D0,args.WT,args.T,args.sf_vector)
+	s+=f'python3.8 {FILEDIR}/runEquinox.py --material {args.material} --D0 {args.D0} --WT {args.WT} --T {args.T:d} --dnir 1.0 --case 0  --sf_vector {args.sf_vector}'
 
 	f=open(os.path.join(CASEDIR,'jobscript'),'w+')
 	f.write(s)
@@ -104,17 +94,17 @@ def run_cases(args):
 			for case in range(data.shape[0]):
 				CASEDIR=os.path.join(DNIDIR,'job%d'%case)
 				os.chdir(CASEDIR)
-				os.system('qsub -N %sT%dD%sJ%d jobscript'%(mydict[args.material],args.T,dni,case)) # CHANGE THIS JOB NAMEs
+				os.system(f'qsub -N {args.casename[0]}{args.casename[-2::]}-d{dnir}-j{case} jobscript') # CHANGE THIS JOB NAMEs
 
 		CASEDIR=os.path.join(MATDIR,'equinox')
 		os.chdir(CASEDIR)
-		os.system('qsub -N equinox jobscript') # CHANGE THIS JOB NAME
+		os.system(f'qsub -N {args.casename[0]}{args.casename[-2::]}-eqnx jobscript') # CHANGE THIS JOB NAME
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Script to prepare folders and jobscripts for independent simulations')
+	parser.add_argument('casename', type=str, default='fatigue6')
 	parser.add_argument('--material', type=str, default='N06230')
 	parser.add_argument('--project', type=str, default='xa1')
-	parser.add_argument('--casename', type=str, default='fatigue6')
 	parser.add_argument('--D0', type=float, default=22.4)
 	parser.add_argument('--WT', type=float, default=1.2)
 	parser.add_argument('--T', type=int, default=565)
