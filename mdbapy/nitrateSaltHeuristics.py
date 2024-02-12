@@ -301,8 +301,9 @@ class receiver_cyl:
 	def __init__(self,coolant = 'salt', Ri = 57.93/2000, Ro = 60.33/2000, T_in = 290, T_out = 565,
                       nz = 450, nt = 46, R_fouling = 0.0, ab = 0.94, em = 0.88, kp = 16.57, H_rec = 10.5, D_rec = 8.5,
                       nbins = 50, alpha = 15.6e-6, Young = 186e9, poisson = 0.31,
-                      thermat = "base",defomat = "const_base",damat = "base",mat='800H',
+                      thermat = "base",defomat = "const_base",damat = "base",mat='800H',P_i=1e6,
                       debugfolder = os.path.expanduser('~'), debug = False, verification = False, Dittus=True,maxiter=100):
+		self.P_i = P_i
 		self.coolant = coolant
 		self.Ri = Ri
 		self.Ro = Ro
@@ -611,6 +612,8 @@ class receiver_cyl:
 		self.stress, self.epsilon = self.crown_stress(Ti,To)
 		self.Ti = Ti[:,0]
 		self.To = To[:,0]
+		self.T_i = Ti
+		self.T_o = To
 		return Qnet
 
 	def Fourier(self,T):
@@ -646,13 +649,19 @@ class receiver_cyl:
 					+ kappa_theta*C*(1 - a2/r2)*(1 - b2/r2);
 		Qtheta = kappa*C*(1 -np.log(b/r) -a2/(b2 - a2)*(1 +b2/r2)*np.log(b/a) ) \
 					+ kappa_theta*C*(3 -(a2 +b2)/r2 -a2*b2/r4);
-		Qz = kappa*self.nu*C*(1 -2*np.log(b/r) -2*a2/(b2 - a2)*np.log(b/a) ) \
-					+ kappa_theta*2*self.nu*C*(2 -(a2 + b2)/r2) -self.l*self.E*T_theta;
+		Qz = kappa*C*(1 -2*np.log(b/r) -2*a2/(b2 - a2)*np.log(b/a) ) \
+					+ kappa_theta*C*(2 -(a2 + b2)/r2) -self.l*self.E*T_theta;
 		Qrtheta = kappa_tau*C*(1 -a2/r2)*(1 -b2/r2);
+
+		PR = ((a2 * self.P_i) / (b2 - a2)) * (1 - (b2 / r2))
+		PTheta = ((a2 * self.P_i) / (b2 - a2)) * (1 + (b2 / r2))
+		## generalised plane strain:
+		PZ =  a2 * self.P_i / (b2 - a2)
+
 
 		Q_Eq = np.sqrt(0.5*(pow(Qr -Qtheta,2) + pow(Qr -Qz,2) + pow(Qz -Qtheta,2)) + 6*pow(Qrtheta,2));
 		Q = np.zeros((6,))
-		Q[0] = Qr; Q[1] = Qtheta; Q[2] = Qz;
+		Q[0] = Qr+PR; Q[1] = Qtheta+PTheta; Q[2] = Qz+PZ; Q[3] = Qrtheta
 		e = np.zeros((6,))
 		e[0] = 1/self.E*(Qr - self.nu*(Qtheta + Qz))
 		e[1] = 1/self.E*(Qtheta - self.nu*(Qr + Qz))
