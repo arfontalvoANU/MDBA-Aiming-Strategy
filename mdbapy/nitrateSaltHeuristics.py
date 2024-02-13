@@ -614,7 +614,7 @@ class receiver_cyl:
 		# Fourier coefficients
 		Ti[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
 		To[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
-		self.stress, self.epsilon = self.crown_stress(Ti,To)
+#		self.stress, self.epsilon = self.crown_stress(Ti,To)
 		self.Ti = Ti
 		self.To = To
 		return Qnet
