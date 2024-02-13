@@ -576,12 +576,14 @@ class receiver_cyl:
 		To = -0.5*np.sqrt(c2) + 0.5*np.sqrt((2.*b)/(a*np.sqrt(c2)) - c2)
 		Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
 		qnet = hf*(Ti - Tf)
-		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
+		self.nt_half=int(self.nt/2)
+		_qnet = qnet
 		Qnet = _qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 		net_zero = np.where(Qnet<0)[0]
 		Qnet[net_zero] = 0.0
 		_qnet[net_zero,:] = 0.0
 		self.qnet = _qnet
+		self.qnet[:,self.nt_half:self.nt]=0.0
 		self.hf = hf
 		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
 		convergence = np.ones_like(To)
@@ -610,7 +612,6 @@ class receiver_cyl:
 			BDp = self.Fourier(Ti[t,:])
 
 		# Fourier coefficients
-		self.nt_half=int(self.nt/2)
 		Ti[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
 		To[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
 		self.stress, self.epsilon = self.crown_stress(Ti,To)
