@@ -299,11 +299,10 @@ class Factors:
 
 class receiver_cyl:
 	def __init__(self,coolant = 'salt', Ri = 57.93/2000, Ro = 60.33/2000, T_in = 290, T_out = 565,
-                      nz = 450, nt = 46, R_fouling = 0.0, ab = 0.94, em = 0.88, kp = 16.57, H_rec = 10.5, D_rec = 8.5,
-                      nbins = 50, alpha = 15.6e-6, Young = 186e9, poisson = 0.31,
-                      thermat = "base",defomat = "const_base",damat = "base",mat='800H',P_i=1e6,
+                      nz = 450, nt = 46, nr = 18, R_fouling = 0.0, ab = 0.94, em = 0.88, kp = 16.57, H_rec = 10.5, D_rec = 8.5,
+                      nbins = 50, alpha = 15.6e-6, Young = 186e9, poisson = 0.31, T0=0.,
+                      thermat = "base",defomat = "const_base",damat = "base",mat='800H',
                       debugfolder = os.path.expanduser('~'), debug = False, verification = False, Dittus=True,maxiter=100):
-		self.P_i = P_i
 		self.coolant = coolant
 		self.Ri = Ri
 		self.Ro = Ro
@@ -312,6 +311,7 @@ class receiver_cyl:
 		self.T_out = T_out + 273.15
 		self.nz = nz
 		self.nt = nt
+		self.nr = nr
 		self.R_fouling = R_fouling
 		self.ab = ab
 		self.em = em
@@ -355,6 +355,7 @@ class receiver_cyl:
 		self.l = alpha
 		self.E = Young
 		self.nu = poisson
+		self.T0 = T0
 		l = self.E*self.nu/((1+self.nu)*(1-2*self.nu));
 		m = 0.5*self.E/(1+self.nu);
 		props = l*np.ones((3,3)) + 2*m*np.identity(3)
@@ -575,13 +576,13 @@ class receiver_cyl:
 		To = -0.5*np.sqrt(c2) + 0.5*np.sqrt((2.*b)/(a*np.sqrt(c2)) - c2)
 		Ti = (To + hf*self.Ri*self.ln/self.kp*Tf)/(1 + hf*self.Ri*self.ln/self.kp)
 		qnet = hf*(Ti - Tf)
-		_qnet = qnet
+		_qnet = np.concatenate((qnet[:,1:-1],qnet[:,::-1]),axis=1)
 		Qnet = _qnet.sum(axis=1)*self.Ri*self.dt*self.dz
 		net_zero = np.where(Qnet<0)[0]
 		Qnet[net_zero] = 0.0
 		_qnet[net_zero,:] = 0.0
 		self.qnet = _qnet
-
+		self.hf = hf
 		self.Q_abs = qabs.sum(axis=1)*self.Ro*self.dt*self.dz
 		convergence = np.ones_like(To)
 		it=0
@@ -609,11 +610,12 @@ class receiver_cyl:
 			BDp = self.Fourier(Ti[t,:])
 
 		# Fourier coefficients
+		self.nt_half=int(self.nt/2)
+		Ti[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
+		To[:,self.nt_half:self.nt]=Tf[:,self.nt_half:self.nt]
 		self.stress, self.epsilon = self.crown_stress(Ti,To)
-		self.Ti = Ti[:,0]
-		self.To = To[:,0]
-		self.T_i = Ti
-		self.T_o = To
+		self.Ti = Ti
+		self.To = To
 		return Qnet
 
 	def Fourier(self,T):
@@ -622,14 +624,18 @@ class receiver_cyl:
 		return coefs
 
 	def crown_stress(self, Ti, To):
-		stress = np.zeros((Ti.shape[0],2,6))
-		strain = np.zeros((Ti.shape[0],2,6))
+		stress = np.zeros((Ti.shape[0],self.nt,self.nr,6))
+		strain = np.zeros((Ti.shape[0],self.nt,self.nr,6))
 		ntimes = Ti.shape[0]
 		for t in range(ntimes):
+			thetas = np.linspace(0.0, np.pi, self.nt)
 			BDp = self.Fourier(Ti[t,:])
 			BDpp = self.Fourier(To[t,:])
-			stress[t,0,:], strain[t,0,:] = self.Thermoelastic(To[t,0], self.Ro, 0., BDp, BDpp)
-			stress[t,1,:], strain[t,1,:] = self.Thermoelastic(Ti[t,0], self.Ri, 0., BDp, BDpp)
+			r = np.linspace(self.Ri,self.Ro,self.nr)
+			for i in range(self.nt):
+				T = np.linspace(Ti[t,i],To[t,i],self.nr)
+				for j in range(self.nr):
+					stress[t,i,j,:], strain[t,i,j,:] = self.Thermoelastic(T[j], r[j], thetas[i], BDp, BDpp)
 		return stress,strain
 
 	def Thermoelastic(self, T, r, theta, BDp, BDpp):
@@ -650,18 +656,12 @@ class receiver_cyl:
 		Qtheta = kappa*C*(1 -np.log(b/r) -a2/(b2 - a2)*(1 +b2/r2)*np.log(b/a) ) \
 					+ kappa_theta*C*(3 -(a2 +b2)/r2 -a2*b2/r4);
 		Qz = kappa*C*(1 -2*np.log(b/r) -2*a2/(b2 - a2)*np.log(b/a) ) \
-					+ kappa_theta*C*(2 -(a2 + b2)/r2) -self.l*self.E*T_theta;
+					+ kappa_theta*2*self.nu*C*(2 -(a2 + b2)/r2) -self.l*self.E*T_theta;
 		Qrtheta = kappa_tau*C*(1 -a2/r2)*(1 -b2/r2);
-
-		PR = ((a2 * self.P_i) / (b2 - a2)) * (1 - (b2 / r2))
-		PTheta = ((a2 * self.P_i) / (b2 - a2)) * (1 + (b2 / r2))
-		## generalised plane strain:
-		PZ =  a2 * self.P_i / (b2 - a2)
-
 
 		Q_Eq = np.sqrt(0.5*(pow(Qr -Qtheta,2) + pow(Qr -Qz,2) + pow(Qz -Qtheta,2)) + 6*pow(Qrtheta,2));
 		Q = np.zeros((6,))
-		Q[0] = Qr+PR; Q[1] = Qtheta+PTheta; Q[2] = Qz+PZ; Q[3] = Qrtheta
+		Q[0] = Qr; Q[1] = Qtheta; Q[2] = Qz; Q[3] = Qrtheta
 		e = np.zeros((6,))
 		e[0] = 1/self.E*(Qr - self.nu*(Qtheta + Qz))
 		e[1] = 1/self.E*(Qtheta - self.nu*(Qr + Qz))
